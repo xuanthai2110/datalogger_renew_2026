@@ -22,15 +22,21 @@ import config
 logger = logging.getLogger(__name__)
 
 class PollingService:
-    def __init__(self, metadata_db: MetadataDB, realtime_db: RealtimeDB):
+    def __init__(self, metadata_db: MetadataDB, realtime_db: RealtimeDB, uploader=None, telemetry_service=None):
         self.metadata_db = metadata_db
         self.realtime_db = realtime_db
+        self.uploader = uploader
+        self.telemetry_service = telemetry_service
         self.normalization = NormalizationService()
         self.tracking = TrackingService(realtime_db)
         
         # Buffer {inverter_id: last_valid_raw_data}
         self.buffer: Dict[int, Dict[str, Any]] = {}
+        # Theo dõi trạng thái để gửi instant alert
+        self.last_states: Dict[int, int] = {} 
+        self.last_faults: Dict[int, int] = {}
         self.transports = {}
+        self.night_mode_projects: Dict[int, bool] = {}
 
     def _get_transport(self, brand: str):
         if "Huawei" in brand:
@@ -55,10 +61,12 @@ class PollingService:
             return SungrowSG110CXDriver(transport, slave_id=slave_id)
         return None
 
-    def poll_all_inverters(self, project_id: int):
+    def poll_all_inverters(self, project_id: int) -> float:
+        """Quét tất cả inverter của dự án, trả về tổng công suất AC phát được"""
         self.tracking.check_resets()
         inverters = self.metadata_db.get_inverters_by_project(project_id)
         active_inverters = [inv for inv in inverters if inv.is_active]
+        total_p_ac = 0.0
         
         for inv in active_inverters:
             try:
@@ -85,10 +93,42 @@ class PollingService:
                 # Log errors if any
                 self.tracking.log_inverter_error(inv, raw_data)
                 
+                # Check for instant alerts (Step 5)
+                self._check_and_send_immediate(inv, raw_data)
+                
+                # Save to memory buffer
                 self.buffer[inv.id] = raw_data
                 
+                # Save to Realtime Cache (Step 3, Type 2 - 10s update)
+                normalized = self.normalization.normalize(raw_data)
+                self.realtime_db.upsert_latest_realtime(inv.id, project_id, normalized)
+                
+                # Accumulate total power for Night Mode check
+                total_p_ac += normalized.get("p_inv_w", 0.0) or 0.0
+                
             except Exception as e:
-                logger.error(f"Error polling inverter {inv.id}: {e}", exc_info=True)
+                logger.error(f"Error polling inverter {inv.id}: {e}")
+        
+        return total_p_ac
+
+    def _check_and_send_immediate(self, inv: Any, raw_data: dict):
+        """Kiểm tra thay đổi trạng thái hoặc lỗi để gửi ngay lên server"""
+        current_state = raw_data.get("state_id")
+        current_fault = raw_data.get("fault_code", 0)
+        
+        state_changed = (inv.id in self.last_states and self.last_states[inv.id] != current_state)
+        fault_changed = (inv.id in self.last_faults and self.last_faults[inv.id] != current_fault)
+        
+        if (state_changed or fault_changed) and self.telemetry_service:
+            logger.info(f"IMMEDIATE TRIGGER: Inverter {inv.id} changed state/fault. Sending full project telemetry.")
+            # Tạo snapshot và đẩy vào buffer ngay lập tức
+            self.telemetry_service.build_and_buffer(inv.project_id)
+            # Kích hoạt uploader gửi ngay các bản ghi trong outbox
+            if self.uploader:
+                self.uploader.upload()
+            
+        self.last_states[inv.id] = current_state
+        self.last_faults[inv.id] = current_fault
 
     def save_to_database(self, project_id: int):
         logger.info(f"Saving 5-minute snapshot for project {project_id}")
@@ -165,7 +205,12 @@ class PollingService:
                 E_monthly=p_sums["emonthly"], E_total=p_sums["etotal"],
                 severity="NORMAL", created_at=now_str
             ))
-            logger.info(f"Database update complete for project {project_id}")
+            
+            # Step 3, Type 1: Lưu snapshot 5 phút cho server qua TelemetryService
+            if self.telemetry_service:
+                self.telemetry_service.build_and_buffer(project_id)
+            
+            logger.info(f"Database update total complete for project {project_id}")
 
     def _handle_inverter_replacement(self, old_inv: Any, new_serial: str):
         logger.info(f"REPLACEMENT: {old_inv.serial_number} -> {new_serial}")
@@ -173,15 +218,42 @@ class PollingService:
         pass
 
     def run_forever(self):
-        project = self.metadata_db.get_project_first()
-        if not project: return
-        logger.info(f"PollingService started for {project.name}")
-        poll_count = 0
+        logger.info("PollingService started with multi-project & night-mode support")
+        last_snapshot_time = 0
+        
         while True:
             t0 = time.time()
-            self.poll_all_inverters(project.id)
-            poll_count += 1
-            if poll_count >= 10:
-                self.save_to_database(project.id)
-                poll_count = 0
-            time.sleep(max(0.1, config.POLL_INTERVAL - (time.time() - t0)))
+            projects = self.metadata_db.get_all_projects()
+            
+            for project in projects:
+                # Step 4: Check Night Mode
+                is_night = self.night_mode_projects.get(project.id, False)
+                
+                # Nếu đang là ban đêm, chúng ta có thể giảm tần suất check 
+                # Ở đây đơn giản là vẫn poll nhưng nếu P_ac vẫn 0 thì skip xử lý nặng
+                # Hoặc skip hẳn việc gọi Modbus nếu muốn tối ưu tuyệt đối.
+                # Tuy nhiên để "tự thức dậy", ta vẫn nên poll.
+                
+                total_p_ac = self.poll_all_inverters(project.id)
+                
+                # Cập nhật trạng thái Night Mode cho chu kỳ sau
+                self.night_mode_projects[project.id] = (total_p_ac <= 0)
+                if is_night and total_p_ac > 0:
+                    logger.info(f"Project {project.id} woke up from Night Mode!")
+                elif not is_night and total_p_ac <= 0:
+                    logger.info(f"Project {project.id} entered Night Mode (P_ac=0)")
+
+            # Step 3, Type 1: Lưu snapshot 5 phút cho server
+            if time.time() - last_snapshot_time >= config.SNAPSHOT_INTERVAL:
+                for project in projects:
+                    self.save_to_database(project.id)
+                last_snapshot_time = time.time()
+                
+            # Step 5: Thực hiện gửi dữ liệu lên server (cả snapshot định kỳ và dữ liệu tức thời nếu còn sót)
+            if self.uploader:
+                self.uploader.upload()
+
+            # Duy trì chu kỳ POLL_INTERVAL (10s)
+            elapsed = time.time() - t0
+            sleep_time = max(0.1, config.POLL_INTERVAL - elapsed)
+            time.sleep(sleep_time)

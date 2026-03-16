@@ -34,7 +34,7 @@ class TelemetryService:
             return False
 
         payload = self._build_payload(project_id, snapshot)
-        self.buffer_service.save(payload)
+        self.buffer_service.save(project_id, payload)
 
         logger.info(
             f"[Telemetry] Buffered telemetry for project_id={project_id} "

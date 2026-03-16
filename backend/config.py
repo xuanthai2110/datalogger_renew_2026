@@ -26,7 +26,8 @@ DEV_MODE     = True
 # ===========================================================
 # POLLING   
 # ===========================================================
-POLL_INTERVAL = 30       # giây
+POLL_INTERVAL = 10       # giây
+SNAPSHOT_INTERVAL = 300  # giây (5 phút)
 
 # ===========================================================
 # COMMUNICATION (CommConfig defaults)

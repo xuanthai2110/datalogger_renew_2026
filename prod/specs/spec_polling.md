@@ -1,116 +1,66 @@
-# Spec: Polling & Thu Thập Dữ Liệu
+# Tài liệu Kỹ thuật: Luồng Polling & Thu thập Dữ liệu
 
-## 1. Mục Tiêu
-
-Thu thập dữ liệu liên tục từ tất cả các inverter đang hoạt động, đảm bảo:
-- Dữ liệu được đọc thường xuyên (30 giây/lần) để phát hiện biến động nhanh.
-- Dữ liệu được lưu vào database theo chu kỳ 5 phút để tối ưu I/O.
-- Không mất dữ liệu khi một lần đọc thất bại.
+Tài liệu này mô tả chi tiết kiến trúc và luồng thực hiện của hệ thống Polling trong Datalogger, bao gồm các service, hàm quan trọng và quy trình tương tác.
 
 ---
 
-## 2. Các Thành Phần Liên Quan
+## 1. Kiến trúc Service
+Hệ thống được thiết kế theo mô hình Service-Oriented nhằm tách biệt trách nhiệm:
 
-| Thành phần | File |
-|---|---|
-| `PollingService` | `services/polling_service.py` |
-| `TrackingService` | `services/tracking_service.py` |
-| `NormalizationService` | `services/normalization_service.py` |
-| Driver (Huawei/Sungrow) | `drivers/` |
-| Database Manager | `database/sqlite_manager.py` |
-| Entry Point | `scripts/run_polling.py` |
-
----
-
-## 3. Chu Kỳ Hoạt Động
-
-```
-             ┌─────────────────────────────────┐
-             │         run_forever()            │
-             └──────────────┬──────────────────┘
-                            │ loop
-              ┌─────────────▼─────────────────┐
-              │     poll_all_inverters()       │ ◄── mỗi 30 giây
-              │  - Kết nối Modbus             │
-              │  - Đọc dữ liệu từ driver      │
-              │  - Kiểm tra serial number      │
-              │  - Tính E_monthly              │
-              │  - Cập nhật Max I/V            │
-              │  - Buffer kết quả              │
-              └─────────────────────────────────┘
-                            │ mỗi 10 lần (5 phút)
-              ┌─────────────▼─────────────────┐
-              │       save_to_database()       │
-              │  - Chuẩn hoá dữ liệu          │
-              │  - Lưu Inverter AC batch       │
-              │  - Lưu MPPT batch              │
-              │  - Lưu String batch            │
-              │  - Lưu Project summary         │
-              └─────────────────────────────────┘
-```
-
----
-
-## 4. Buffer & Xử Lý Lỗi
-
-- **Buffer**: Dictionary `{inverter_id: last_valid_data}` lưu bản đọc cuối cùng thành công.
-- Nếu một lần đọc 30s **thất bại** → buffer giữ nguyên dữ liệu cũ.
-- Khi đến chu kỳ 5 phút → dùng dữ liệu từ buffer (dữ liệu cuối gần nhất).
-- Nếu buffer rỗng (chưa đọc được lần nào) → inverter đó bị bỏ qua trong lần lưu đó.
-
----
-
-## 5. Dữ Liệu Được Lưu Theo Chu Kỳ 5 Phút
-
-### Bảng `inverter_ac_realtime`
-| Trường | Đơn vị | Mô tả |
+| Service | Vai trò | Hàm quan trọng |
 |---|---|---|
-| `V_a`, `V_b`, `V_c` | V | Điện áp pha A, B, C |
-| `I_a`, `I_b`, `I_c` | A | Dòng điện pha A, B, C |
-| `P_ac` | kW | Công suất tác dụng AC |
-| `Q_ac` | kVAr | Công suất phản kháng AC |
-| `PF` | — | Hệ số công suất (-1 đến 1) |
-| `H` | Hz | Tần số lưới |
-| `Temp_C` | °C | Nhiệt độ inverter |
-| `IR` | kΩ | Điện trở cách điện |
-| `E_daily` | kWh | Sản lượng trong ngày |
-| `E_monthly` | kWh | Sản lượng trong tháng (tính theo delta) |
-| `E_total` | kWh | Tổng sản lượng tích luỹ |
-
-### Bảng `mppt_realtime`
-| Trường | Mô tả |
-|---|---|
-| `V_mppt`, `I_mppt`, `P_mppt` | Điện áp/Dòng/Công suất tức thời |
-| `Max_V`, `Max_I`, `Max_P` | Giá trị cực đại trong ngày |
-
-### Bảng `string_realtime`
-| Trường | Mô tả |
-|---|---|
-| `I_string` | Dòng điện tức thời |
-| `max_I` | Dòng điện cực đại trong ngày |
-
-### Bảng `project_realtime`
-Tổng hợp từ tất cả inverter: `P_ac`, `P_dc`, `E_daily`, `E_monthly`, `E_total`, `Temp_C` max.
+| `main.py` | Orchestration (Khởi tạo và chạy luồng chính) | `main()` |
+| `PollingService` | Điều phối việc quét dữ liệu và quản lý Snapshot | `run_forever()`, `poll_all_inverters()`, `save_to_database()` |
+| `ProjectService` | Tổng hợp dữ liệu từ nhiều bảng DB thành snapshot | `get_project_snapshot()` |
+| `TelemetryService` | Đóng gói JSON theo format Server | `build_and_buffer()`, `_build_payload()` |
+| `BufferService` | Quản lý hàng đợi gửi dữ liệu (Outbox) | `save()`, `get_all()`, `delete()` |
+| `RealtimeDB` | Tương tác SQLite cho dữ liệu thực tế | `post_inverter_ac_batch()`, `upsert_latest_realtime()`, `post_to_outbox()` |
+| `UploaderService` | Gửi dữ liệu lên Server qua API | `upload()`, `send_immediate()` |
+| `NormalizationService` | Chuẩn hóa đơn vị và kiểm tra giải giá trị | `normalize()` |
+| `TrackingService` | Tính toán năng lượng tháng và giá trị MAX | `update_energy()`, `update_max_values()` |
 
 ---
 
-## 6. Kiểm Tra Serial Number & Thay Thế Inverter
+## 2. Quy trình Chi tiết (Polling Flow)
 
-Mỗi chu kỳ 30 giây:
-1. Đọc `serial_number` từ inverter thực tế.
-2. So sánh với `serial_number` trong `metadata.db`.
-3. Nếu **không khớp** → Inverter đã được thay thế:
-   - Tạo inverter mới trong DB với serial mới.
-   - Mark inverter cũ là `is_active = False`, ghi `replaced_by_id`.
-   - Hệ thống sẽ cần sync lên Server ở lần tiếp theo.
+### Giai đoạn 1: Chu kỳ Quét (Mỗi 10 giây)
+1. **`PollingService.run_forever()`**: Gọi `metadata_db.get_all_projects()` để lấy danh sách dự án.
+2. **`poll_all_inverters(project_id)`**:
+    - Kiểm tra danh sách Inverter của dự án.
+    - Với mỗi Inverter:
+        - Gọi **Driver** (`read_all()`) để lấy dữ liệu qua Modbus.
+        - **`TrackingService.update_energy()`**: Tính năng lượng lũy kế.
+        - **`NormalizationService.normalize()`**: Làm sạch dữ liệu.
+        - **`RealtimeDB.upsert_latest_realtime()`**: Lưu bản ghi 10s vào bảng `latest_realtime` (để Web UI local truy cập).
+        - **`_check_and_send_immediate()`**: Nếu trạng thái/lỗi thay đổi so với chu kỳ trước -> Gọi ngay `telemetry_service.build_and_buffer()` và `uploader.upload()` để cập nhật Server tức thì.
+3. **Cơ chế Night Mode**: Nếu tổng `P_ac` của toàn dự án = 0, đánh dấu dự án vào trạng thái "Night Mode" để tối ưu tài nguyên.
+
+### Giai đoạn 2: Chu kỳ Snapshot (Mỗi 5 phút)
+1. **`PollingService.save_to_database(project_id)`**:
+    - Thu thập tất cả dữ liệu thành công từ bộ nhớ đệm (`self.buffer`).
+    - Lưu các bản ghi snapshot vào DB local: `inverter_ac_realtime`, `mppt_realtime`, `string_realtime`, `project_realtime`.
+2. **`TelemetryService.build_and_buffer(project_id)`**:
+    - Gọi **`ProjectService.get_project_snapshot(project_id)`**: Hàm này sử dụng **Batch Loading (SQL Window Function)** để thu thập Snapshot mới nhất của toàn bộ AC, MPPT, String và Errors của một dự án chỉ qua vài câu query hiệu quả.
+    - **`_build_payload()`**: Đóng gói thành cấu trúc JSON phân cấp sâu.
+    - **`BufferService.save()`**: Lưu JSON payload vào bảng `uploader_outbox` trong `realtime.db`.
+
+### Giai đoạn 3: Chu kỳ Tải lên (Độc lập hoặc Tuần tự)
+1. **`UploaderService.upload()`**:
+    - Lấy danh sách từ hàng đợi `uploader_outbox`.
+    - Gửi `POST` lên Server Endpoint.
+    - Nếu Server phản hồi 200 OK -> Xoá bản ghi trong hàng đợi (`delete_from_outbox`).
 
 ---
 
-## 7. Cấu Hình
+## 3. Cấu trúc Cơ sở dữ liệu liên quan (RealtimeDB)
+- `latest_realtime`: Lưu 1 bản ghi duy nhất/1 inverter (Upsert mỗi 10s).
+- `project_realtime` & `inverter_ac_realtime`: Lưu lịch sử snapshot (Mỗi 5 phút).
+- `uploader_outbox`: Hàng đợi dữ liệu JSON chờ Cloud sync.
+- `inverter_errors`: Lưu vết các lỗi quan trọng.
 
-| Tham số | Giá trị | File |
-|---|---|---|
-| `POLL_INTERVAL` | 30 (giây) | `config.py` |
-| Chu kỳ lưu DB | 10 × POLL_INTERVAL = 5 phút | `polling_service.py` |
-| `MODBUS_TCP_HOST` | IP inverter | `config.py` |
-| `MODBUS_PORT` | Cổng RTU | `config.py` |
+---
+
+## 4. Tham số Cấu hình chính (`config.py`)
+- `POLL_INTERVAL = 10`
+- `SNAPSHOT_INTERVAL = 300`
+- `API_BASE_URL = "..."`

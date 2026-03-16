@@ -307,6 +307,7 @@ class MetadataDB:
             """, (user.username, hashed_password, user.email, user.fullname, user.phone, user.role))
             return cursor.lastrowid
 
+
     def get_user_by_username(self, username: str) -> Optional[dict]:
         with self._connect() as conn:
             row = conn.execute("SELECT * FROM users WHERE username=?", (username,)).fetchone()
@@ -575,6 +576,18 @@ class RealtimeDB:
             cursor = conn.cursor()
 
             # =====================================================
+            # UPLOADER OUTBOX (Queue for Server)
+            # =====================================================
+            cursor.execute("""
+            CREATE TABLE IF NOT EXISTS uploader_outbox (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                project_id INTEGER,
+                data_json TEXT,
+                created_at TEXT
+            );
+            """)
+
+            # =====================================================
             # PROJECT REALTIME
             # =====================================================
             cursor.execute("""
@@ -652,6 +665,18 @@ class RealtimeDB:
                 I_string REAL,  
                 max_I REAL,
                 created_at TEXT
+            );
+            """)
+
+            # =====================================================
+            # LATEST REALTIME (For local Web UI)
+            # =====================================================
+            cursor.execute("""
+            CREATE TABLE IF NOT EXISTS latest_realtime (
+                inverter_id INTEGER PRIMARY KEY,
+                project_id INTEGER,
+                data_json TEXT,
+                updated_at TEXT
             );
             """)
 
@@ -1024,3 +1049,51 @@ class RealtimeDB:
             ]
             for table in tables:
                 conn.execute(f"DELETE FROM {table} WHERE inverter_id = ?", (inverter_id,))
+
+    # --- Latest Realtime Cache ---
+    def upsert_latest_realtime(self, inverter_id: int, project_id: int, data: dict):
+        import json
+        from datetime import datetime
+        now_str = datetime.now().isoformat()
+        data_json = json.dumps(data)
+        with self._connect() as conn:
+            conn.execute("""
+                INSERT INTO latest_realtime (inverter_id, project_id, data_json, updated_at)
+                VALUES (?, ?, ?, ?)
+                ON CONFLICT(inverter_id) DO UPDATE SET
+                    project_id=excluded.project_id,
+                    data_json=excluded.data_json,
+                    updated_at=excluded.updated_at
+            """, (inverter_id, project_id, data_json, now_str))
+
+    def get_latest_realtime(self, inverter_id: int) -> Optional[dict]:
+        import json
+        with self._connect() as conn:
+            row = conn.execute("SELECT data_json FROM latest_realtime WHERE inverter_id=?", (inverter_id,)).fetchone()
+            return json.loads(row["data_json"]) if row else None
+
+    # --- Uploader Outbox ---
+    def post_to_outbox(self, project_id: int, data: dict):
+        import json
+        from datetime import datetime
+        now_str = datetime.now().isoformat()
+        with self._connect() as conn:
+            conn.execute("""
+                INSERT INTO uploader_outbox (project_id, data_json, created_at)
+                VALUES (?, ?, ?)
+            """, (project_id, json.dumps(data), now_str))
+
+    def get_all_outbox(self) -> List[dict]:
+        import json
+        with self._connect() as conn:
+            rows = conn.execute("SELECT id, project_id, data_json, created_at FROM uploader_outbox").fetchall()
+            result = []
+            for r in rows:
+                d = json.loads(r["data_json"])
+                d["id"] = r["id"] # Gán ID để uploader có thể xoá sau khi gửi
+                result.append(d)
+            return result
+
+    def delete_from_outbox(self, record_id: int):
+        with self._connect() as conn:
+            conn.execute("DELETE FROM uploader_outbox WHERE id=?", (record_id,))
