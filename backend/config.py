@@ -14,6 +14,13 @@ DATABASE_DIR = BASE_DIR / "database"
 METADATA_DB    = str(DATABASE_DIR / "metadata.db")
 REALTIME_DB    = str(DATABASE_DIR / "realtime.db")
 TOKEN_FILE     = str(DATABASE_DIR / "tokens.json")
+
+# CACHE_DB: Dữ liệu thực tế 10s lưu trên RAM để bảo vệ thẻ SD
+# Trên Raspberry Pi/Linux: /dev/shm là phân vùng RAM
+if os.path.exists("/dev/shm"):
+    CACHE_DB = "/dev/shm/hirubic_cache.db"
+else:
+    CACHE_DB = str(DATABASE_DIR / "cache.db")
 # ===========================================================
 # API
 # ===========================================================

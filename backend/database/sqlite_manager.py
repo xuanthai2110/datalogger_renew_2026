@@ -1050,27 +1050,6 @@ class RealtimeDB:
             for table in tables:
                 conn.execute(f"DELETE FROM {table} WHERE inverter_id = ?", (inverter_id,))
 
-    # --- Latest Realtime Cache ---
-    def upsert_latest_realtime(self, inverter_id: int, project_id: int, data: dict):
-        import json
-        from datetime import datetime
-        now_str = datetime.now().isoformat()
-        data_json = json.dumps(data)
-        with self._connect() as conn:
-            conn.execute("""
-                INSERT INTO latest_realtime (inverter_id, project_id, data_json, updated_at)
-                VALUES (?, ?, ?, ?)
-                ON CONFLICT(inverter_id) DO UPDATE SET
-                    project_id=excluded.project_id,
-                    data_json=excluded.data_json,
-                    updated_at=excluded.updated_at
-            """, (inverter_id, project_id, data_json, now_str))
-
-    def get_latest_realtime(self, inverter_id: int) -> Optional[dict]:
-        import json
-        with self._connect() as conn:
-            row = conn.execute("SELECT data_json FROM latest_realtime WHERE inverter_id=?", (inverter_id,)).fetchone()
-            return json.loads(row["data_json"]) if row else None
 
     # --- Uploader Outbox ---
     def post_to_outbox(self, project_id: int, data: dict):

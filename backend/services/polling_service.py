@@ -22,9 +22,10 @@ import config
 logger = logging.getLogger(__name__)
 
 class PollingService:
-    def __init__(self, metadata_db: MetadataDB, realtime_db: RealtimeDB, uploader=None, telemetry_service=None):
+    def __init__(self, metadata_db: MetadataDB, realtime_db: RealtimeDB, uploader=None, telemetry_service=None, cache_db=None):
         self.metadata_db = metadata_db
         self.realtime_db = realtime_db
+        self.cache_db = cache_db
         self.uploader = uploader
         self.telemetry_service = telemetry_service
         self.normalization = NormalizationService()
@@ -100,8 +101,9 @@ class PollingService:
                 self.buffer[inv.id] = raw_data
                 
                 # Save to Realtime Cache (Step 3, Type 2 - 10s update)
-                normalized = self.normalization.normalize(raw_data)
-                self.realtime_db.upsert_latest_realtime(inv.id, project_id, normalized)
+                if self.cache_db:
+                    normalized = self.normalization.normalize(raw_data)
+                    self.cache_db.upsert_latest_realtime(inv.id, project_id, normalized)
                 
                 # Accumulate total power for Night Mode check
                 total_p_ac += normalized.get("p_inv_w", 0.0) or 0.0
