@@ -430,7 +430,13 @@ HUAWEI_FAULT_MAP = {
 # -------------------------
 # GRID FAULTS
 # -------------------------
-
+    2000:{
+        "id_huawei": 2000,
+        "id_unified": 0,
+        "name": "RUNNING",
+        "severity": "STABLE",
+        "repair_instruction": "Inverter is running normally."
+    },
     2001: {
         "id_huawei": 2001,
         "id_unified": 1,
