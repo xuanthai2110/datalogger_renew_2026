@@ -1073,7 +1073,9 @@ class RealtimeDB:
                 result.append(d)
             return result
 
-    def delete_from_outbox(self, record_id: int):\n        with self._connect() as conn:\n            conn.execute("DELETE FROM uploader_outbox WHERE id=?", (record_id,))\n
+    def delete_from_outbox(self, record_id: int):
+        with self._connect() as conn:
+            conn.execute("DELETE FROM uploader_outbox WHERE id=?", (record_id,))
 
 class CacheDB:
     """
