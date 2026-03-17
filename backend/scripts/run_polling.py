@@ -13,6 +13,7 @@ from services.uploader_service import UploaderService
 from services.buffer_service import BufferService
 from services.project_service import ProjectService
 from services.telemetry_service import TelemetryService
+from services.fault_state_service import FaultStateService
 import config
 
 # Configure logging
@@ -40,8 +41,9 @@ def main():
         telemetry_service = TelemetryService(project_service, buffer_service)
         
         uploader = UploaderService(buffer_service)
+        fault_service = FaultStateService()
         
-        service = PollingService(metadata_db, realtime_db, uploader, telemetry_service, cache_db)
+        service = PollingService(metadata_db, realtime_db, uploader, telemetry_service, cache_db, fault_service)
         service.run_forever()
     except KeyboardInterrupt:
         logger.info("Polling Service stopped by user.")

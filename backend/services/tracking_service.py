@@ -137,22 +137,24 @@ class TrackingService:
 
     def log_inverter_error(self, inv: Any, data: dict):
         """Lưu lỗi vào DB nếu severity là lỗi thực sự"""
+        from datetime import timezone
         severity = data.get("severity", "STABLE")
         fault_code = data.get("fault_code", 0)
         
-        # Chỉ lưu nếu là ERROR hoặc cảnh báo quan trọng (tùy user, ở đây tôi ưu tiên ERROR)
-        if fault_code != 0 and severity == "ERROR":
+        # Chỉ lưu nếu có mã lỗi và severity không phải STABLE (hoặc là ERROR)
+        if fault_code != 0 and severity in ["WARNING", "ERROR"]:
             err = InverterErrorCreate(
                 project_id=inv.project_id,
                 inverter_id=inv.id,
                 fault_code=fault_code,
-                fault_description=data.get("fault_description", "Unknown Fault"),
+                # Ưu tiên lấy từ data (đã enrichment ở PollingService)
+                fault_description=data.get("fault_description") or data.get("fault_name") or "Unknown Fault",
                 repair_instruction=data.get("repair_instruction", ""),
                 severity=severity,
-                created_at=datetime.now().isoformat()
+                created_at=datetime.now(timezone.utc).isoformat()
             )
             self.realtime_db.post_inverter_error(err)
-            logger.warning(f"FAULT Logged: {inv.id} - {err.fault_description}")
+            logger.warning(f"FAULT Logged: {inv.id} - {err.fault_description} ({severity})")
 
     def get_max_data(self, inverter_id: int):
         return {

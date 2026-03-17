@@ -22,12 +22,13 @@ import config
 logger = logging.getLogger(__name__)
 
 class PollingService:
-    def __init__(self, metadata_db: MetadataDB, realtime_db: RealtimeDB, uploader=None, telemetry_service=None, cache_db=None):
+    def __init__(self, metadata_db: MetadataDB, realtime_db: RealtimeDB, uploader=None, telemetry_service=None, cache_db=None, fault_service=None):
         self.metadata_db = metadata_db
         self.realtime_db = realtime_db
         self.cache_db = cache_db
         self.uploader = uploader
         self.telemetry_service = telemetry_service
+        self.fault_service = fault_service
         self.normalization = NormalizationService()
         self.tracking = TrackingService(realtime_db)
         
@@ -77,6 +78,29 @@ class PollingService:
                 
                 raw_data = driver.read_all()
                 if not raw_data: continue
+                
+                # Enrichment: Dịch mã lỗi và trạng thái bằng FaultStateService
+                if self.fault_service:
+                    # Map State
+                    state_id = raw_data.get("state_id", 0)
+                    state_info = self.fault_service.map_state(inv.brand, state_id)
+                    raw_data["state_name"] = state_info["name"]
+                    
+                    # Map Fault
+                    fault_code = raw_data.get("fault_code", 0)
+                    if fault_code != 0:
+                        fault_info = self.fault_service.map_fault(inv.brand, fault_code)
+                        raw_data["fault_description"] = fault_info["name"]
+                        raw_data["repair_instruction"] = fault_info["repair_instruction"]
+                        raw_data["severity"] = fault_info["severity"]
+                    else:
+                        # Nếu không có lỗi, sử dụng severity của trạng thái (STABLE/WARNING)
+                        raw_data["fault_description"] = None
+                        raw_data["repair_instruction"] = None
+                        raw_data["severity"] = state_info["severity"]
+                else:
+                    # Fallback nếu không có fault_service
+                    raw_data["severity"] = "STABLE"
                 
                 # Replacement logic
                 read_serial = raw_data.get("serial_number")
