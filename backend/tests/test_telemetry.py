@@ -31,7 +31,7 @@ def run_test():
         metadata_db = MetadataDB()
         realtime_db = RealtimeDB()
         cache_db = CacheDB()
-        buffer_service = BufferService()
+        buffer_service = BufferService(realtime_db)
         
         # 2. Initialize Services
         project_service = ProjectService(metadata_db, realtime_db)
