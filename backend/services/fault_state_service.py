@@ -971,3 +971,48 @@ def create_unified_fault_payload(fault_code: int = 0, fault_description: str = N
             "severity": severity,
             "created_at": datetime.datetime.now().isoformat()
         }
+
+class FaultStateService:
+    def __init__(self):
+        self.state_maps = {
+            "HUAWEI": HUAWEI_STATE_MAP,
+            "SUNGROW": SUNGROW_STATE_MAP
+        }
+        self.fault_maps = {
+            "HUAWEI": HUAWEI_FAULT_MAP,
+            "SUNGROW": SUNGROW_FAULT_MAP
+        }
+
+    def map_state(self, brand: str, state_id: int) -> dict:
+        brand = brand.upper()
+        mapping = self.state_maps.get(brand, {})
+        state_info = mapping.get(state_id)
+        
+        if state_info:
+            return {
+                "name": state_info["name"],
+                "severity": state_info["severity"],
+                "description": state_info.get("description", "")
+            }
+        return {
+            "name": f"UNKNOWN_STATE_{state_id}",
+            "severity": "STABLE",
+            "description": "Unknown inverter state"
+        }
+
+    def map_fault(self, brand: str, fault_code: int) -> dict:
+        brand = brand.upper()
+        mapping = self.fault_maps.get(brand, {})
+        fault_info = mapping.get(fault_code)
+        
+        if fault_info:
+            return {
+                "name": fault_info["name"],
+                "severity": fault_info["severity"],
+                "repair_instruction": fault_info.get("repair_instruction", "No instructions available.")
+            }
+        return {
+            "name": f"UNKNOWN_FAULT_{fault_code}",
+            "severity": "WARNING",
+            "repair_instruction": "Contact technical support."
+        }
