@@ -51,7 +51,10 @@ class MockUploader:
         records = self.buffer_service.get_all()
         count = len(records)
         if count > 0:
-            test_logger.info(f"🚀 [SERVER] Đã build telemetry ({count} bản ghi). Chế độ TEST: Bỏ qua bước upload.")
+            test_logger.info(f"🚀 [SERVER] Đã (giả) gửi telemetry cho {count} project(s) lên server.")
+            # Xoá bản ghi để giả lập đã gửi xong, tránh loop vô hạn
+            for rec in records:
+                self.buffer_service.delete(rec["id"])
         return True
 
 def main():
