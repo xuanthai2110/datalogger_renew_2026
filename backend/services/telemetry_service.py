@@ -21,6 +21,130 @@ class TelemetryService:
     # PUBLIC
     # ------------------------------------------------------------------
 
+    def build_from_memory(self, project_id: int, server_id: int, inverters: list, cache_buffer: dict, tracking_service) -> dict:
+        """
+        Builds telemetry payload directly from memory buffer (Bước 4)
+        """
+        timestamp = datetime.now().strftime("%Y-%m-%dT%H:%M:%S.%f") + "+07:00"
+        
+        project_rt = {
+            "Temp_C": -99.0, "P_ac": 0.0, "P_dc": 0.0,
+            "E_daily": 0.0, "E_monthly": 0.0, "E_total": 0.0,
+        }
+        
+        inverters_block = []
+        for inv in inverters:
+            if inv.id not in cache_buffer:
+                continue
+                
+            data = cache_buffer[inv.id]
+            
+            def s_get(key, default=0.0):
+                v = data.get(key, default)
+                return v if v is not None else default
+
+            ac_block = {
+                "IR": s_get("ir"), "Temp_C": s_get("temp_c"),
+                "P_ac": s_get("p_inv_w"), "Q_ac": s_get("q_inv_var"),
+                "V_a": s_get("v_a"), "V_b": s_get("v_b"), "V_c": s_get("v_c"),
+                "I_a": s_get("i_a"), "I_b": s_get("i_b"), "I_c": s_get("i_c"),
+                "PF": s_get("pf"), "H": s_get("grid_hz"),
+                "E_daily": s_get("e_daily"), "E_monthly": s_get("e_monthly"), "E_total": s_get("e_total"),
+                "created_at": timestamp
+            }
+            
+            project_rt["P_ac"] += ac_block["P_ac"]
+            project_rt["P_dc"] += s_get("p_dc_w")
+            project_rt["E_daily"] += ac_block["E_daily"]
+            project_rt["E_monthly"] += ac_block["E_monthly"]
+            project_rt["E_total"] += ac_block["E_total"]
+            project_rt["Temp_C"] = max(project_rt["Temp_C"], ac_block["Temp_C"])
+            
+            max_data = tracking_service.get_max_data(inv.id)
+            strings_per_mppt_list = [int(x.strip()) for x in (inv.strings_per_mppt or "").split(",")] if inv.strings_per_mppt else []
+            
+            mppts_block = []
+            for i in range(1, inv.mppt_count + 1):
+                v = s_get(f"mppt_{i}_voltage")
+                curr = s_get(f"mppt_{i}_current")
+                mx = max_data["mppt"].get(i, {"Max_V": 0, "Max_I": 0, "Max_P": 0})
+                
+                string_count_on_this = strings_per_mppt_list[i-1] if i <= len(strings_per_mppt_list) else 0
+                
+                strings_block = []
+                for s_i in range(1, string_count_on_this + 1):
+                    global_s_i = sum(strings_per_mppt_list[:i-1]) + s_i if strings_per_mppt_list else s_i
+                    strings_block.append({
+                        "string_index": s_i,
+                        "I_mppt": s_get(f"string_{global_s_i}_current"),
+                        "Max_I": max_data["string"].get(global_s_i, 0.0),
+                        "created_at": timestamp
+                    })
+
+                mppts_block.append({
+                    "mppt_index": i,
+                    "string_on_mppt": string_count_on_this,
+                    "V_mppt": v,
+                    "I_mppt": curr,
+                    "P_mppt": round(v * curr, 2),
+                    "Max_I": mx["Max_I"],
+                    "Max_V": mx["Max_V"],
+                    "Max_P": mx["Max_P"],
+                    "created_at": timestamp,
+                    "strings": strings_block
+                })
+
+            fc = data.get("fault_code", 0)
+            if fc == 0:
+                errors_block = [{
+                    "fault_code": 0,
+                    "fault_description": "RUNNING",
+                    "repair_instruction": "",
+                    "severity": "STABLE",
+                    "created_at": timestamp
+                }]
+            else:
+                errors_block = [{
+                    "fault_code": fc,
+                    "fault_description": data.get("fault_description") or "",
+                    "repair_instruction": data.get("repair_instruction") or "",
+                    "severity": data.get("severity") or "STABLE",
+                    "created_at": timestamp
+                }]
+                
+            inverters_block.append({
+                "serial_number": inv.serial_number,
+                "ac": ac_block,
+                "mppts": mppts_block,
+                "errors": errors_block
+            })
+            
+        if project_rt["Temp_C"] == -99.0:
+            project_rt["Temp_C"] = 0.0
+            
+        project_block = {
+            "Temp_C": project_rt["Temp_C"],
+            "P_ac": project_rt["P_ac"] if project_rt["P_ac"] > 0 else None,
+            "P_dc": project_rt["P_dc"] if project_rt["P_dc"] > 0 else None,
+            "E_daily": project_rt["E_daily"],
+            "E_monthly": project_rt["E_monthly"],
+            "E_total": project_rt["E_total"],
+            "severity": "STABLE",
+            "created_at": timestamp
+        }
+        
+        payload = self._normalize_payload({
+            "project": project_block,
+            "inverters": inverters_block
+        })
+        
+        return {
+            "project_id": project_id,
+            "server_id": server_id,
+            "timestamp": timestamp,
+            **payload
+        }
+
     def build_and_buffer(self, project_id: int) -> bool:
         """
         Lấy snapshot của project, build telemetry payload và đẩy vào buffer.
@@ -69,8 +193,8 @@ class TelemetryService:
         project_rt = snapshot.get("project") or {}
         project_block = {
             "Temp_C":     project_rt.get("Temp_C", 0),
-            "P_ac":       project_rt.get("P_ac", 0),
-            "P_dc":       project_rt.get("P_dc", 0),
+            "P_ac":       project_rt.get("P_ac") if project_rt.get("P_ac") is not None and project_rt.get("P_ac") > 0 else None,
+            "P_dc":       project_rt.get("P_dc") if project_rt.get("P_dc") is not None and project_rt.get("P_dc") > 0 else None,
             "E_daily":    project_rt.get("E_daily", 0),
             "E_monthly":  project_rt.get("E_monthly", 0),
             "E_total":    project_rt.get("E_total", 0),
@@ -200,14 +324,18 @@ class TelemetryService:
 
     @staticmethod
     def _format_ts(ts: str) -> str:
-        """Đảm bảo format ISO và kết thúc bằng Z"""
+        """Đảm bảo format ISO với múi giờ +07:00"""
         if not ts: return ""
-        if ts.endswith("Z"): return ts
         
+        # Nếu đã có offset múi giờ (+xx:xx) thì giữ nguyên, 
+        # Nếu kết thúc bằng Z hoặc không có múi giờ thì gắn +07:00
+        if "+" in ts or (ts.count("-") >= 3 and ":" in ts): 
+            return ts
+            
+        if ts.endswith("Z"):
+            return ts.replace("Z", "+07:00")
+            
         if " " in ts and "T" not in ts:
             ts = ts.replace(" ", "T")
             
-        if "+00:00" in ts:
-            return ts.replace("+00:00", "Z")
-            
-        return ts + "Z"
+        return ts + "+07:00"
