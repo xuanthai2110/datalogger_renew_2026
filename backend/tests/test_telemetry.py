@@ -131,24 +131,18 @@ def buoc_3_tao_telemetry(
 
     payload = telemetry_service._build_payload(project.id, snapshot)
 
-    # --- Format chuẩn server: chỉ "project" và "inverters" ---
-    output_payload = {
-        "project":   payload["project"],
-        "inverters": payload["inverters"],
-    }
-
     logger.info(
         f"Telemetry built cho project '{project.name}' (server_id={project.server_id}): "
         f"{len(payload.get('inverters', []))} inverter(s)"
     )
 
-    # Lưu file JSON (có dấu { } ngoài cùng) cho việc kiểm tra
+    # Lưu file JSON chuẩn định dạng schema lên server
     with open(output_file, "w", encoding="utf-8") as f:
-        json.dump(output_payload, f, indent=4, ensure_ascii=False)
+        json.dump(payload, f, indent=4, ensure_ascii=False)
         
     logger.info(f"Đã lưu telemetry → {os.path.abspath(output_file)}")
 
-    # Trả về full payload cho all_results
+    # Trả về payload cho all_results (cần ghép thêm dữ liệu định dạng buffer cho console table nếu cần)
     return payload
 
 

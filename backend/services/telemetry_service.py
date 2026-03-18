@@ -34,11 +34,21 @@ class TelemetryService:
             return False
 
         payload = self._build_payload(project_id, snapshot)
-        self.buffer_service.save(project_id, payload)
+        
+        # BufferService và UploaderService cần các metadata ở mức ngoài cùng
+        timestamp = payload.get("project", {}).get("created_at")
+        buffer_data = {
+            "project_id": project_id,
+            "server_id": snapshot.get("metadata", {}).get("server_id"),
+            "timestamp": timestamp,
+            **payload
+        }
+        
+        self.buffer_service.save(project_id, buffer_data)
 
         logger.info(
             f"[Telemetry] Buffered telemetry for project_id={project_id} "
-            f"at {payload['timestamp']}"
+            f"at {timestamp}"
         )
         return True
 
