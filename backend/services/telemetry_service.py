@@ -62,7 +62,8 @@ class TelemetryService:
         Nếu inverter không có lỗi, thêm một bản ghi "RUNNING" vào errors.
         """
         # Server yêu cầu định dạng ISO với chữ Z ở cuối và đầy đủ microsecond (6 chữ số)
-        timestamp = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%f") + "Z"
+        # Sử dụng giờ local của Raspberry Pi (hệ thống) để tránh bị lệch 7 tiếng
+        timestamp = datetime.now().strftime("%Y-%m-%dT%H:%M:%S.%f") + "Z"
 
         # --- Project realtime ---
         project_rt = snapshot.get("project") or {}
