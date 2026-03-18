@@ -1,109 +1,231 @@
+# tests/test_telemetry.py
+"""
+Bài test one-shot cho toàn bộ luồng telemetry.
+
+LUỒNG CHÍNH:
+  Bước 1 - Đọc dữ liệu    : Poll inverter qua Modbus → raw_data
+  Bước 2 - Xử lý          : Chuẩn hoá + mapping fault/state → ghi DB
+  Bước 3 - Tạo telemetry  : Build payload từ snapshot → ghi data.json
+
+Chạy:
+  cd backend
+  python tests/test_telemetry.py
+"""
+
 import os
 import sys
 import json
 import logging
-import time
-from datetime import datetime, timezone
 
-# Add backend to path
-sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
+# --- Path setup -------------------------------------------------------
+sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
 
 from database.sqlite_manager import MetadataDB, RealtimeDB, CacheDB
 from services.project_service import ProjectService
+from services.buffer_service import BufferService
 from services.telemetry_service import TelemetryService
 from services.fault_state_service import FaultStateService
 from services.polling_service import PollingService
-from services.buffer_service import BufferService
 import config
 
-# Configure logging to console
+# --- Logging ----------------------------------------------------------
 logging.basicConfig(
     level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
 )
 logger = logging.getLogger("TestTelemetry")
 
+OUTPUT_FILE = "data.json"
+
+
+# ======================================================================
+# BƯỚC 1: ĐỌC DỮ LIỆU
+# ======================================================================
+def buoc_1_doc_du_lieu(service: PollingService, project_id: int) -> bool:
+    """
+    Poll tất cả inverter của project qua Modbus.
+    Kết quả raw_data được lưu vào service.buffer[inv.id].
+
+    Returns:
+        True  – nếu ít nhất một inverter phản hồi.
+        False – nếu không có inverter nào.
+    """
+    logger.info("=== BƯỚC 1: ĐỌC DỮ LIỆU TỪ INVERTER ===")
+    total_p_ac = service.poll_all_inverters(project_id)
+
+    if not service.buffer:
+        logger.warning("Không có dữ liệu từ inverter (buffer rỗng). Kiểm tra kết nối Modbus.")
+        return False
+
+    logger.info(f"Poll thành công {len(service.buffer)} inverter(s). Tổng P_ac = {total_p_ac:.2f} kW")
+    for inv_id, raw in service.buffer.items():
+        logger.info(
+            f"  [INV {inv_id}] state={raw.get('state_id')} | "
+            f"fault={raw.get('fault_code')} | "
+            f"p_ac={raw.get('p_inv_w')} kW | "
+            f"e_total={raw.get('e_total')} kWh"
+        )
+    return True
+
+
+# ======================================================================
+# BƯỚC 2: TÍNH TOÁN, CHUẨN HOÁ, MAPPING LỖI & TRẠNG THÁI
+# ======================================================================
+def buoc_2_xu_ly(service: PollingService, project_id: int) -> bool:
+    """
+    Từ buffer đã có:
+      - NormalizationService chuẩn hoá các giá trị vật lý (đơn vị, làm tròn, loại bỏ ngoài khoảng).
+      - FaultStateService đã map fault_code → fault_description, state_id → state_name (đã chạy ở bước 1).
+      - Ghi snapshot 5 phút vào RealtimeDB (bảng inverter_ac, mppt, string, project).
+      - TelemetryService build payload và đẩy vào buffer gửi server.
+
+    Returns:
+        True nếu ghi DB thành công.
+    """
+    logger.info("=== BƯỚC 2: CHUẨN HOÁ + MAPPING + GHI DATABASE ===")
+
+    if not service.buffer:
+        logger.error("Buffer rỗng – bỏ qua bước 2.")
+        return False
+
+    # Log kết quả mapping (đã thực hiện trong bước 1 bởi FaultStateService)
+    for inv_id, raw in service.buffer.items():
+        logger.info(
+            f"  [INV {inv_id}] state_name='{raw.get('state_name')}' | "
+            f"fault_desc='{raw.get('fault_description')}' | "
+            f"severity='{raw.get('severity')}' | "
+            f"e_monthly={raw.get('e_monthly')} kWh"
+        )
+
+    # Chuẩn hoá + ghi DB + build telemetry buffer
+    service.save_to_database(project_id)
+    logger.info(f"Đã ghi snapshot vào RealtimeDB cho project {project_id}.")
+    return True
+
+
+# ======================================================================
+# BƯỚC 3: TẠO TELEMETRY
+# ======================================================================
+def buoc_3_tao_telemetry(
+    project_service: ProjectService,
+    telemetry_service: TelemetryService,
+    project,
+    output_file: str,
+) -> dict | None:
+    """
+    Lấy snapshot mới nhất từ RealtimeDB → build telemetry payload.
+    Ghi kết quả ra file JSON để kiểm tra trực quan.
+
+    Returns:
+        payload dict nếu thành công, None nếu không có snapshot.
+    """
+    logger.info("=== BƯỚC 3: TẠO TELEMETRY PAYLOAD ===")
+
+    snapshot = project_service.get_project_snapshot(project.id)
+    if not snapshot:
+        logger.warning(f"Không có snapshot cho project {project.id} – bỏ qua.")
+        return None
+
+    payload = telemetry_service._build_payload(project.id, snapshot)
+
+    # Loại bỏ các trường internal (không gửi lên server)
+    clean_payload = {
+        k: v for k, v in payload.items()
+        if k not in ("id", "project_id", "server_id", "timestamp")
+    }
+
+    logger.info(
+        f"Telemetry built cho project '{project.name}' (server_id={project.server_id}): "
+        f"{len(payload.get('inverters', []))} inverter(s)"
+    )
+
+    with open(output_file, "w", encoding="utf-8") as f:
+        json.dump(payload, f, indent=4, ensure_ascii=False)
+    logger.info(f"Đã lưu telemetry → {os.path.abspath(output_file)}")
+
+    return clean_payload
+
+
+# ======================================================================
+# MAIN
+# ======================================================================
 def run_test():
-    logger.info("Starting One-Shot Telemetry Test...")
-    
+    logger.info("Bắt đầu One-Shot Telemetry Test (3 bước)...")
+
     try:
-        # 1. Initialize DBs with paths from config
+        # --- Khởi tạo DB ---
         metadata_db = MetadataDB(config.METADATA_DB)
         realtime_db = RealtimeDB(config.REALTIME_DB)
-        cache_db = CacheDB(config.CACHE_DB)
-        buffer_service = BufferService(realtime_db)
-        
-        # 2. Initialize Services
-        project_service = ProjectService(metadata_db, realtime_db)
+        cache_db    = CacheDB(config.CACHE_DB)
+
+        # --- Khởi tạo Services ---
+        buffer_service   = BufferService(realtime_db)
+        project_service  = ProjectService(metadata_db, realtime_db)
         telemetry_service = TelemetryService(project_service, buffer_service)
-        fault_service = FaultStateService()
-        
-        # Chúng ta không truyền uploader để đảm bảo không gửi lên server
+        fault_service    = FaultStateService()
+
+        # uploader=None → không gửi lên server
         service = PollingService(
-            metadata_db, 
-            realtime_db, 
-            uploader=None, 
-            telemetry_service=telemetry_service, 
+            metadata_db,
+            realtime_db,
+            uploader=None,
+            telemetry_service=telemetry_service,
             cache_db=cache_db,
-            fault_service=fault_service
+            fault_service=fault_service,
         )
-        
-        # 3. Get projects
+
+        # --- Lấy danh sách projects ---
         projects = metadata_db.get_all_projects()
         if not projects:
-            logger.error("No projects found in database!")
+            logger.error("Không tìm thấy project nào trong database!")
             return
 
-        all_telemetry = []
+        all_results = []
 
         for project in projects:
-            logger.info(f"Processing Project: {project.name} (ID: {project.id})")
-            
-            # Đọc dữ liệu từ Inverters (Step 1-2: Poll & Enrichment & Tracking)
-            # service.poll_all_inverters(project.id)
-            
-            # Lưu snapshot 5p vào RealtimeDB (để telemetry lấy ra)
-            service.save_to_database(project.id)
-            
-            # Build Telemetry Payload (Step 4)
-            # Thay vì gọi build_and_buffer, ta gọi _build_payload để lấy trực tiếp dữ liệu
-            snapshot = project_service.get_project_snapshot(project.id)
-            if snapshot:
-                payload = telemetry_service._build_payload(project.id, snapshot)
-                
-                # Làm sạch payload (loại bỏ extra fields như Uploader làm)
-                clean_payload = payload.copy()
-                clean_payload.pop("id", None)
-                clean_payload.pop("project_id", None)
-                clean_payload.pop("server_id", None)
-                clean_payload.pop("timestamp", None)
-                
-                all_telemetry.append({
-                    "project_name": project.name,
-                    "local_id": project.id,
-                    "server_id": project.server_id,
-                    "payload": clean_payload
-                })
-            else:
-                logger.warning(f"No snapshot data for project {project.id}")
+            logger.info(f"\n{'='*60}")
+            logger.info(f"PROJECT: {project.name} (local_id={project.id}, server_id={project.server_id})")
+            logger.info(f"{'='*60}")
 
-        # 4. Save to data.json
-        output_file = "data.json"
-        if all_telemetry:
-            # Chỉ lấy payload của project đầu tiên để khớp mẫu data.txt (không có [])
-            final_data = all_telemetry[0]["payload"]
-            with open(output_file, "w", encoding="utf-8") as f:
-                json.dump(final_data, f, indent=4, ensure_ascii=False)
-            logger.info(f"Success! Telemetry data saved to {os.path.abspath(output_file)}")
+            # BƯỚC 1
+            ok = buoc_1_doc_du_lieu(service, project.id)
+            if not ok:
+                logger.warning(f"Bỏ qua project {project.id} do không đọc được dữ liệu.")
+                continue
+
+            # BƯỚC 2
+            ok = buoc_2_xu_ly(service, project.id)
+            if not ok:
+                logger.warning(f"Bỏ qua project {project.id} do lỗi ghi DB.")
+                continue
+
+            # BƯỚC 3
+            payload = buoc_3_tao_telemetry(
+                project_service,
+                telemetry_service,
+                project,
+                OUTPUT_FILE,
+            )
+            if payload:
+                all_results.append({
+                    "project_name": project.name,
+                    "local_id":     project.id,
+                    "server_id":    project.server_id,
+                    "payload":      payload,
+                })
+
+        # --- Tổng kết ---
+        print("\n" + "=" * 60)
+        if all_results:
+            print(f"DONE: {len(all_results)} project(s) xử lý thành công.")
+            print(f"      Kiểm tra kết quả tại: {os.path.abspath(OUTPUT_FILE)}")
         else:
-            logger.error("No telemetry data to save.")
-            
-        print("\n" + "="*50)
-        print(f"DONE: Please check {output_file}")
-        print("="*50 + "\n")
+            print("DONE: Không có telemetry nào được tạo (xem log phía trên).")
+        print("=" * 60 + "\n")
 
     except Exception as e:
-        logger.error(f"Test failed: {e}", exc_info=True)
+        logger.error(f"Test thất bại: {e}", exc_info=True)
+
 
 if __name__ == "__main__":
     run_test()
