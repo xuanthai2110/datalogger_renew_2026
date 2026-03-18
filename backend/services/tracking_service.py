@@ -109,7 +109,7 @@ class TrackingService:
         for i in range(1, mppt_count + 1):
             v = round(data.get(f"mppt_{i}_voltage", 0.0) or 0.0, 2)
             i_val = round(data.get(f"mppt_{i}_current", 0.0) or 0.0, 2)
-            p = round(abs(v * i_val) / 1000.0, 2) # Công suất luôn dương
+            p = round(abs(v * i_val), 2) # Công suất luôn dương
             
             # Kiểm tra ngược cực
             if v < -1.0 or i_val < -1.0:
