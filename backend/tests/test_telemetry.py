@@ -215,9 +215,9 @@ def run_test():
                 OUTPUT_FILE,
             )
             if payload:
-                all_results.append({
+                all_results.append(
                     "payload":      payload,
-                })
+                )
 
         # --- Tổng kết ---
         print("\n" + "=" * 60)
