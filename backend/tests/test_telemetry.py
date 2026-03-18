@@ -114,7 +114,9 @@ def buoc_3_tao_telemetry(
 ) -> dict | None:
     """
     Lấy snapshot mới nhất từ RealtimeDB → build telemetry payload.
-    Ghi kết quả ra file JSON để kiểm tra trực quan.
+    Ghi kết quả ra file JSON theo format giống data.txt để kiểm tra trực quan:
+      - Chỉ giữ "project" và "inverters" (bỏ project_id, server_id, timestamp cấp ngoài)
+      - Khi inverter không có lỗi → errors = ["RUNNING"]
 
     Returns:
         payload dict nếu thành công, None nếu không có snapshot.
@@ -128,10 +130,15 @@ def buoc_3_tao_telemetry(
 
     payload = telemetry_service._build_payload(project.id, snapshot)
 
-    # Loại bỏ các trường internal (không gửi lên server)
-    clean_payload = {
-        k: v for k, v in payload.items()
-        if k not in ("id", "project_id", "server_id", "timestamp")
+    # --- Post-process: errors = ["RUNNING"] khi không có lỗi thực ---
+    for inv in payload.get("inverters", []):
+        if not inv.get("errors"):
+            inv["errors"] = ["RUNNING"]
+
+    # --- Format giống data.txt: chỉ "project" và "inverters" ---
+    output_payload = {
+        "project":   payload["project"],
+        "inverters": payload["inverters"],
     }
 
     logger.info(
@@ -140,10 +147,11 @@ def buoc_3_tao_telemetry(
     )
 
     with open(output_file, "w", encoding="utf-8") as f:
-        json.dump(payload, f, indent=4, ensure_ascii=False)
+        json.dump(output_payload, f, indent=4, ensure_ascii=False)
     logger.info(f"Đã lưu telemetry → {os.path.abspath(output_file)}")
 
-    return clean_payload
+    # Trả về full payload (có project_id, server_id) để lưu vào all_results
+    return payload
 
 
 # ======================================================================
@@ -208,9 +216,6 @@ def run_test():
             )
             if payload:
                 all_results.append({
-                    "project_name": project.name,
-                    "local_id":     project.id,
-                    "server_id":    project.server_id,
                     "payload":      payload,
                 })
 
