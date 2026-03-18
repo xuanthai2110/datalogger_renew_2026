@@ -26,6 +26,12 @@ logging.basicConfig(
     format='%(asctime)s - %(levelname)s - %(message)s'
 )
 
+# Tắt triệt để log từ các module ồn ào
+logging.getLogger("pymodbus").setLevel(logging.WARNING)
+logging.getLogger("services.polling_service").setLevel(logging.WARNING)
+logging.getLogger("communication.modbus_tcp").setLevel(logging.WARNING)
+logging.getLogger("communication.modbus_rtu").setLevel(logging.WARNING)
+
 # Logger riêng cho script test này để in thông tin theo yêu cầu
 test_logger = logging.getLogger("TestConsole")
 test_logger.setLevel(logging.INFO)
