@@ -78,6 +78,7 @@ class PollingService:
                 
                 raw_data = driver.read_all()
                 if not raw_data: continue
+                logger.info(f"Read data success - Inverter {inv.id}")
                 
                 if self.fault_service:
                     # Map State (truyền mã thô vào, service tự xử lý chuyển đổi cho Huawei)
@@ -129,6 +130,7 @@ class PollingService:
                 if self.cache_db:
                     normalized = self.normalization.normalize(raw_data)
                     self.cache_db.upsert_latest_realtime(inv.id, project_id, normalized)
+                    logger.info(f"Saved Inverter {inv.id} data to CacheDB")
                 
                 # Accumulate total power for Night Mode check
                 total_p_ac += normalized.get("p_inv_w", 0.0) or 0.0
@@ -237,7 +239,7 @@ class PollingService:
             if self.telemetry_service:
                 self.telemetry_service.build_and_buffer(project_id)
             
-            logger.info(f"Database update total complete for project {project_id}")
+            logger.info(f"Saved 5-minute snapshot for project {project_id} to RealtimeDB and buffered for upload")
 
     def _handle_inverter_replacement(self, old_inv: Any, new_serial: str):
         logger.info(f"REPLACEMENT: {old_inv.serial_number} -> {new_serial}")

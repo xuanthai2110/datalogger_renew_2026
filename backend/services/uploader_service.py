@@ -30,9 +30,6 @@ class UploaderService:
                 payload.pop("server_id", None)
                 payload.pop("timestamp", None)
 
-                # In JSON mức INFO để luôn thấy được trên console
-                logger.info(f"--- DEBUG TELEMETRY JSON (Local ID: {data.get('project_id')}) ---\n{json.dumps(payload, indent=2)}\n--- END JSON ---")
-
                 server_id = data.get("server_id")
                 if not server_id:
                     logger.warning(f"Project (local_id: {data.get('project_id')}) has no server_id. Skipping upload.")
@@ -44,6 +41,7 @@ class UploaderService:
                 response = requests.post(url, json=payload, headers=headers)
                 if response.status_code == 200:
                     self.buffer.delete(data["id"])
+                    logger.info(f"Uploaded telemetry for project_id {data.get('project_id')} to server_id {server_id}")
                 else:
                     logger.warning(f"Upload failed for project {server_id}: {response.status_code} - {response.text}")
             except Exception as e:
@@ -62,9 +60,6 @@ class UploaderService:
         payload.pop("project_id", None)
         payload.pop("server_id", None)
         payload.pop("timestamp", None)
-
-        # In JSON mức INFO để luôn thấy được trên console
-        logger.info(f"--- DEBUG IMMEDIATE JSON (Server ID: {server_id}) ---\n{json.dumps(payload, indent=2)}\n--- END JSON ---")
 
         if not server_id:
             logger.warning(f"Project (local_id: {data.get('project_id')}) has no server_id. Cannot send immediate update.")
