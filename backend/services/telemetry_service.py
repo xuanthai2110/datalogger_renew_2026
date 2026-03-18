@@ -62,9 +62,8 @@ class TelemetryService:
         Chuẩn hoá snapshot thành telemetry payload theo đúng format server.
         Nếu inverter không có lỗi, thêm một bản ghi "RUNNING" vào errors.
         """
-        # Server yêu cầu định dạng ISO với chữ Z ở cuối và đầy đủ microsecond (6 chữ số)
-        # Sử dụng giờ local của Raspberry Pi (hệ thống) để tránh bị lệch 7 tiếng
-        timestamp = datetime.now().strftime("%Y-%m-%dT%H:%M:%S.%f") + "Z"
+        # Sử dụng giờ local và gắn cứng múi giờ +7 theo định dạng yêu cầu
+        timestamp = datetime.now().strftime("%Y-%m-%dT%H:%M:%S.%f") + "Z+07:00"
 
         # --- Project realtime ---
         project_rt = snapshot.get("project") or {}
