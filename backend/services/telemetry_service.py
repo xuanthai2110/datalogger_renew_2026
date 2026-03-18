@@ -62,8 +62,8 @@ class TelemetryService:
         Chuẩn hoá snapshot thành telemetry payload theo đúng format server.
         Nếu inverter không có lỗi, thêm một bản ghi "RUNNING" vào errors.
         """
-        # Sử dụng giờ local và gắn cứng múi giờ +7 theo định dạng yêu cầu
-        timestamp = datetime.now().strftime("%Y-%m-%dT%H:%M:%S.%f") + "Z+07:00"
+        # Sử dụng giờ local và gắn cứng múi giờ +07:00 (không có Z)
+        timestamp = datetime.now().strftime("%Y-%m-%dT%H:%M:%S.%f") + "+07:00"
 
         # --- Project realtime ---
         project_rt = snapshot.get("project") or {}
