@@ -40,7 +40,8 @@ class MockUploader:
     def upload(self):
         # Chỉ log ra là có dữ liệu trong buffer thay vì gửi đi
         # Tránh việc làm sạch buffer nếu muốn kiểm tra data.json sau đó
-        count = self.buffer_service.get_pending_count()
+        records = self.buffer_service.get_all()
+        count = len(records)
         if count > 0:
             logger.info(f"[MOCK UPLOADER] Có {count} bản ghi telemetry chờ gửi. SKIPPING UPLOAD (Test Mode).")
         return True
