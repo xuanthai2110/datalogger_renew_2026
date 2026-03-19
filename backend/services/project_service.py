@@ -161,6 +161,13 @@ class ProjectService:
         inverters_json = []
         for inv in inverters_meta:
             inv_id = inv.id
+            lj = latest_json_map.get(inv_id, {})
+            # DEBUG
+            if lj.get("mapped_status"):
+                logger.info(f"Snapshot: Inverter {inv_id} has mapped_status: {lj['mapped_status']['fault_description']}")
+            else:
+                logger.warning(f"Snapshot: Inverter {inv_id} MISSING mapped_status!")
+            
             mppts = mppt_map.get(inv_id, [])
             for m in mppts:
                 m["strings"] = string_map.get((inv_id, m["mppt_index"]), [])

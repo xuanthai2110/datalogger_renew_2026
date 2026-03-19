@@ -94,23 +94,33 @@ class TelemetryService:
                     "strings": strings_block
                 })
 
-            fc = data.get("fault_code", 0)
-            if fc == 0:
-                errors_block = [{
-                    "fault_code": 0,
-                    "fault_description": "RUNNING",
-                    "repair_instruction": "",
-                    "severity": "STABLE",
-                    "created_at": timestamp
-                }]
+            # Lấy thông tin lỗi/trạng thái đã được mapping từ PollingService
+            mapped_status = data.get("mapped_status")
+            if mapped_status:
+                inv_severity = mapped_status["severity"]
+                errors_block = [mapped_status]
             else:
-                errors_block = [{
-                    "fault_code": fc,
-                    "fault_description": data.get("fault_description") or "",
-                    "repair_instruction": data.get("repair_instruction") or "",
-                    "severity": data.get("severity") or "STABLE",
-                    "created_at": timestamp
-                }]
+                # Fallback cũ nếu không có mapped_status
+                fc = data.get("fault_code", 0)
+                if fc == 0:
+                    state_name = data.get("state_name", "RUNNING")
+                    inv_severity = data.get("severity", "STABLE")
+                    errors_block = [{
+                        "fault_code": 0,
+                        "fault_description": state_name,
+                        "repair_instruction": "",
+                        "severity": inv_severity,
+                        "created_at": timestamp
+                    }]
+                else:
+                    inv_severity = data.get("severity") or "STABLE"
+                    errors_block = [{
+                        "fault_code": fc,
+                        "fault_description": data.get("fault_description") or "",
+                        "repair_instruction": data.get("repair_instruction") or "",
+                        "severity": inv_severity,
+                        "created_at": timestamp
+                    }]
                 
             inverters_block.append({
                 "serial_number": inv.serial_number,
@@ -174,12 +184,16 @@ class TelemetryService:
     # PRIVATE
     # ------------------------------------------------------------------
 
-    def _build_payload(self, project_id: int, snapshot: dict) -> dict:
+    def _build_payload(self, project_id: int, snapshot: dict) -> list:
         """
         Chuẩn hoá snapshot thành telemetry payload theo đúng format server.
-        Nếu inverter không có lỗi, thêm một bản ghi "RUNNING" vào errors.
+        Trả về một LIST chứa OBJECT project (Server yêu cầu array).
         """
-        # Sử dụng giờ local và gắn cứng múi giờ +07:00 (không có Z)
+        # Lấy metadata project để lấy server_id
+        project_meta = self.project_service.get_project(project_id)
+        server_id = getattr(project_meta, "server_id", 0) if project_meta else 0
+
+        # Sử dụng giờ local và gắn cứng múi giờ +07:00
         timestamp = datetime.now().strftime("%Y-%m-%dT%H:%M:%S.%f") + "+07:00"
 
         # --- Project realtime ---
@@ -191,7 +205,7 @@ class TelemetryService:
             "E_daily":    project_rt.get("E_daily", 0),
             "E_monthly":  project_rt.get("E_monthly", 0),
             "E_total":    project_rt.get("E_total", 0),
-            "severity":   "STABLE", 
+            "severity":   snapshot.get("project", {}).get("severity", "STABLE"), 
             "created_at": timestamp,
         }
 
@@ -201,26 +215,29 @@ class TelemetryService:
             spm_config = inv.get("strings_per_mppt")
             spm_list = [int(x.strip()) for x in spm_config.split(",")] if spm_config else []
 
-            # Xử lý errors
+            # Xử lý errors (Đã mapping qua FaultStateService)
             raw_errors = inv.get("errors") or []
+            mapped_status = inv.get("mapped_status")
+            
             if not raw_errors:
-                # Nếu không có lỗi, tạo object "RUNNING" như server yêu cầu
-                errors_block = [
-                    {
-                        "fault_code": 0,
-                        "fault_description": "RUNNING",
-                        "repair_instruction": "",
-                        "severity": "STABLE",
-                        "created_at": timestamp
-                    }
-                ]
+                if mapped_status:
+                    inv_severity = mapped_status["severity"]
+                    errors_block = [mapped_status]
+                    if "created_at" not in errors_block[0]:
+                        errors_block[0]["created_at"] = timestamp
+                else:
+                    inv_severity = inv.get("severity") or "STABLE"
+                    errors_block = [
+                        {
+                            "fault_code": 0,
+                            "fault_description": inv.get("state_name") or "RUNNING",
+                            "repair_instruction": "",
+                            "severity": inv_severity,
+                            "created_at": timestamp
+                        }
+                    ]
             else:
                 errors_block = [self._build_error(e, timestamp) for e in raw_errors]
-
-                # Đảm bảo repair_instruction không null (ưu tiên string rỗng nếu None)
-                for e in errors_block:
-                    if e.get("repair_instruction") is None:
-                        e["repair_instruction"] = ""
 
             inverters_block.append({
                 "serial_number": inv.get("serial_number", ""),
@@ -229,18 +246,24 @@ class TelemetryService:
                 "errors": errors_block,
             })
 
-        # Project block: Chỉ làm tròn tại đây, không gọi _normalize_payload để tránh range check
+        # Project block: Chỉ làm tròn
         for k, v in project_block.items():
             if isinstance(v, float):
                 project_block[k] = round(v, 2)
 
-        # Inverters block: Vẫn chạy chuẩn hóa để đảm bảo an toàn dữ liệu nhánh
+        # Inverters block: Chạy chuẩn hóa
         inverters_block = self._normalize_payload(inverters_block)
 
-        return {
+        # Tạo payload cuối cùng (Object trong một List)
+        result = {
+            "project_id": project_id,
+            "server_id":  server_id,
+            "timestamp":  timestamp,
             "project":    project_block,
             "inverters":  inverters_block,
         }
+        
+        return [result]
 
     def _normalize_payload(self, data: Any) -> Any:
         """Chuẩn hoá và làm tròn toàn bộ JSON telemetry payload trước khi gửi"""
@@ -319,7 +342,7 @@ class TelemetryService:
             "fault_code":         error.get("fault_code", 0),
             "fault_description":  error.get("fault_description", ""),
             "repair_instruction": error.get("repair_instruction") or "",
-            "severity":           "STABLE",
+            "severity":           error.get("severity") or "STABLE",
             "created_at":         self._format_ts(error.get("created_at") or fallback_ts),
         }
 
