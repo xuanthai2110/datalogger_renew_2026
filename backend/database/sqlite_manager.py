@@ -746,6 +746,21 @@ class RealtimeDB:
                 data_dict["created_at"]
             ))
 
+    def upsert_latest_realtime(self, inverter_id: int, project_id: int, data: dict):
+        import json
+        from datetime import datetime
+        now_str = datetime.now().isoformat()
+        data_json = json.dumps(data)
+        with self._connect() as conn:
+            conn.execute("""
+                INSERT INTO latest_realtime (inverter_id, project_id, data_json, updated_at)
+                VALUES (?, ?, ?, ?)
+                ON CONFLICT(inverter_id) DO UPDATE SET
+                    project_id=excluded.project_id,
+                    data_json=excluded.data_json,
+                    updated_at=excluded.updated_at
+            """, (inverter_id, project_id, data_json, now_str))
+
     def get_latest_project_realtime(self, project_id: int) -> Optional[ProjectRealtimeResponse]:
         """Lấy dữ liệu realtime mới nhất của project"""
         with self._connect() as conn:

@@ -126,17 +126,20 @@ class PollingService:
                 # Log errors if any
                 self.tracking.log_inverter_error(inv, raw_data)
                 
-                # Check for instant alerts (Step 5)
-                self._check_and_send_immediate(inv, raw_data)
-                
                 # Save to memory buffer
                 self.buffer[inv.id] = raw_data
                 
                 # Save to Realtime Cache (Step 3, Type 2 - 10s update)
+                normalized = self.normalization.normalize(raw_data)
                 if self.cache_db:
-                    normalized = self.normalization.normalize(raw_data)
                     self.cache_db.upsert_latest_realtime(inv.id, project_id, normalized)
                     logger.info(f"Saved Inverter {inv.id} data to CacheDB")
+                # Cập nhật vào database chính để ProjectService có thể lấy cho Telemetry Snapshot
+                self.realtime_db.upsert_latest_realtime(inv.id, project_id, normalized)
+                logger.info(f"Saved Inverter {inv.id} data to RealtimeDB (latest)")
+
+                # Check for instant alerts (Step 5) - Gọi SAU KHI đã lưu DB để build_and_buffer lấy được data mới nhất
+                self._check_and_send_immediate(inv, raw_data)
                 
                 # Accumulate total power for Night Mode check
                 total_p_ac += normalized.get("p_inv_w", 0.0) or 0.0
