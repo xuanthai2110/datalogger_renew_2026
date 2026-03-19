@@ -120,9 +120,16 @@ def main():
             # Chạy poll gốc
             p_total = original_poll(project_id)
             
-            # Thống kê kết quả
+            # Thống kê kết quả chi tiết
             results = []
             for inv_id, data in service.buffer.items():
+                state_id = data.get("state_id", "N/A")
+                state_name = data.get("state_name", "Unknown")
+                fault_code = data.get("fault_code", 0)
+                fault_desc = data.get("fault_description") or "None"
+                
+                # In trạng thái thô (Step 1 requirement)
+                test_logger.info(f"   └─ [INV {inv_id}] Raw Status: State={state_id} ({state_name}) | Fault={fault_code} ({fault_desc})")
                 results.append(f"Inverter {inv_id}: OK")
             
             if results:
@@ -149,8 +156,20 @@ def main():
             if old_fault is not None and old_fault != new_fault:
                 test_logger.warning(f"🚨 [CHANGE] Inverter {inv.id}: Fault {old_fault} -> {new_fault} ({raw_data.get('fault_description')})")
 
+        # Monkey patch TelemetryService để in trạng thái tạo payload
+        original_build_and_buffer = telemetry_service.build_and_buffer
+        def patched_build_and_buffer(project_id):
+            test_logger.info(f"⚡ [PAYLOAD] Bắt đầu tạo telemetry cho Project {project_id}...")
+            res = original_build_and_buffer(project_id)
+            if res:
+                test_logger.info(f"✅ [PAYLOAD] Hoàn tất tạo payload và lưu vào buffer.")
+            else:
+                test_logger.warning(f"⚠️  [PAYLOAD] Không có dữ liệu snapshot để tạo payload.")
+            return res
+
         service.poll_all_inverters = patched_poll
         service._check_and_send_immediate = patched_check
+        telemetry_service.build_and_buffer = patched_build_and_buffer
 
         service.run_forever()
         

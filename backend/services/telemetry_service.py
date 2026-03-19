@@ -160,12 +160,7 @@ class TelemetryService:
         
         # BufferService và UploaderService cần các metadata ở mức ngoài cùng
         timestamp = payload.get("project", {}).get("created_at")
-        buffer_data = {
-            "project_id": project_id,
-            "server_id": snapshot.get("metadata", {}).get("server_id"),
-            "timestamp": timestamp,
-            **payload
-        }
+        buffer_data = payload
         
         self.buffer_service.save(project_id, buffer_data)
 
