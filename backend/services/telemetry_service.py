@@ -122,27 +122,25 @@ class TelemetryService:
         if project_rt["Temp_C"] == -99.0:
             project_rt["Temp_C"] = 0.0
             
+        # Dữ liệu project: Chỉ làm tròn, không chạy qua NormalizationService (Tránh range check)
         project_block = {
-            "Temp_C": project_rt["Temp_C"],
-            "P_ac": project_rt["P_ac"] if project_rt["P_ac"] > 0 else None,
-            "P_dc": project_rt["P_dc"] if project_rt["P_dc"] > 0 else None,
-            "E_daily": project_rt["E_daily"],
-            "E_monthly": project_rt["E_monthly"],
-            "E_total": project_rt["E_total"],
+            "Temp_C": round(project_rt["Temp_C"], 2),
+            "P_ac": round(project_rt["P_ac"], 2) if project_rt["P_ac"] > 0 else None,
+            "P_dc": round(project_rt["P_dc"], 2) if project_rt["P_dc"] > 0 else None,
+            "E_daily": round(project_rt["E_daily"], 2),
+            "E_monthly": round(project_rt["E_monthly"], 2),
+            "E_total": round(project_rt["E_total"], 2),
             "severity": "STABLE",
             "created_at": timestamp
         }
         
-        payload = self._normalize_payload({
-            "project": project_block,
-            "inverters": inverters_block
-        })
+        # Dữ liệu inverters: Vẫn chuẩn hóa (đã làm trong bước build inverters_block ở trên)
+        # Nhưng để chắc chắn, ta chạy _normalize_payload cho riêng danh sách inverters
+        inverters_block = self._normalize_payload(inverters_block)
         
         return {
-            "project_id": project_id,
-            "server_id": server_id,
-            "timestamp": timestamp,
-            **payload
+            "project": project_block,
+            "inverters": inverters_block
         }
 
     def build_and_buffer(self, project_id: int) -> bool:
@@ -236,10 +234,18 @@ class TelemetryService:
                 "errors": errors_block,
             })
 
-        return self._normalize_payload({
+        # Project block: Chỉ làm tròn tại đây, không gọi _normalize_payload để tránh range check
+        for k, v in project_block.items():
+            if isinstance(v, float):
+                project_block[k] = round(v, 2)
+
+        # Inverters block: Vẫn chạy chuẩn hóa để đảm bảo an toàn dữ liệu nhánh
+        inverters_block = self._normalize_payload(inverters_block)
+
+        return {
             "project":    project_block,
             "inverters":  inverters_block,
-        })
+        }
 
     def _normalize_payload(self, data: Any) -> Any:
         """Chuẩn hoá và làm tròn toàn bộ JSON telemetry payload trước khi gửi"""
