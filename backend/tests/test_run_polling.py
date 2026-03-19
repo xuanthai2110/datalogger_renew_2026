@@ -7,6 +7,7 @@ Dùng để kiểm tra luồng đọc Modbus -> Ghi Cache -> Ghi RealtimeDB -> B
 import sys
 import os
 import logging
+import json
 
 # Thêm project root vào path
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -51,8 +52,34 @@ class MockUploader:
         records = self.buffer_service.get_all()
         count = len(records)
         if count > 0:
-            test_logger.info(f"🚀 [SERVER] Đã (giả) gửi telemetry cho {count} project(s) lên server.")
-            # Xoá bản ghi để giả lập đã gửi xong, tránh loop vô hạn
+            test_logger.info(f"🚀 [SERVER] Đã (giả) gửi telemetry cho {count} project(s). Đang ghi file data.json...")
+            
+            # Ghi file data.json để user kiểm tra (lấy bản ghi cuối cùng hoặc bản ghi đầu tiên tùy ý, 
+            # ở đây ta ghi toàn bộ list nếu có nhiều project, hoặc chỉ object nếu là 1)
+            output_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "data.json")
+            
+            try:
+                # Nếu chỉ có 1 bản ghi (thông thường cho 1 project), ghi trực tiếp object đó
+                # Nếu có nhiều, ghi thành list
+                data_to_save = records[0] if count == 1 else records
+                
+                with open(output_path, "w", encoding="utf-8") as f:
+                    json.dump(data_to_save, f, indent=4, ensure_ascii=False)
+                test_logger.info(f"💾 [FILE] Đã lưu payload vào: {output_path}")
+            except Exception as e:
+                test_logger.error(f"❌ [FILE] Lỗi khi ghi data.json: {e}")
+
+            # In chi tiết lỗi của từng inverter nếu có
+            for rec in records:
+                inverters = rec.get("inverters", [])
+                for inv in inverters:
+                    sn = inv.get("serial_number", "N/A")
+                    errs = inv.get("errors", [])
+                    if errs:
+                        err_json = json.dumps(errs, indent=4, ensure_ascii=False)
+                        test_logger.info(f"   └─ [INV {sn}] Errors Payload:\n{err_json}")
+
+            # Xoá bản ghi để giả lập đã gửi xong
             for rec in records:
                 self.buffer_service.delete(rec["id"])
         return True
