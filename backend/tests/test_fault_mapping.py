@@ -1,115 +1,113 @@
 """
-TEST: Nhập mã lỗi thô từ driver → FaultStateService → In JSON kết quả
-
+TEST: Đọc inverter từ MetadataDB -> Polling thực tế -> FaultStateService -> In kết quả mapping
 Chạy: python backend/tests/test_fault_mapping.py
 """
 import sys
 import os
 import json
+import logging
 
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
+# Thêm project root vào path
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+from database.sqlite_manager import MetadataDB
 from services.fault_state_service import FaultStateService
+from communication.modbus_tcp import ModbusTCP
+from communication.modbus_rtu import ModbusRTU
+from drivers.huawei_sun2000110KTL import HuaweiSUN2000
+import config
 
-service = FaultStateService()
+# Tắt log modbus để output sạch
+logging.getLogger("pymodbus").setLevel(logging.WARNING)
 
-BRANDS = ["HUAWEI", "SUNGROW"]
-
-
-def test_map(brand: str, state_raw: int, fault_code: int):
-    result = {
-        "input": {
-            "brand": brand,
-            "state_raw": state_raw,
-            "state_hex": hex(state_raw),
-            "fault_code": fault_code
-        },
-        "output": {}
-    }
-
-    # Map state
-    state_info = service.map_state(brand, state_raw)
-    result["output"]["state"] = state_info
-
-    # Map fault
-    if fault_code and fault_code != 0:
-        fault_info = service.map_fault(brand, fault_code)
-        result["output"]["fault"] = fault_info
+def get_transport(brand: str):
+    if "Huawei" in brand:
+        t = ModbusTCP(host=config.MODBUS_TCP_HOST, port=config.MODBUS_TCP_PORT)
+        if t.connect():
+            return t
     else:
-        result["output"]["fault"] = None
+        t = ModbusRTU(port=config.MODBUS_PORT, baudrate=config.MODBUS_BAUDRATE)
+        if t.connect():
+            return t
+    return None
 
-    return result
+def get_driver(brand: str, transport, slave_id: int):
+    if "Huawei" in brand:
+        return HuaweiSUN2000(transport, slave_id=slave_id)
+    # Thêm brand khác nếu cần
+    return None
 
+def run_live_test():
+    metadata_db = MetadataDB(config.METADATA_DB)
+    fault_service = FaultStateService()
+    
+    print("\n" + "="*70)
+    print("  LIVE FAULT MAPPING TEST - Đọc từ Inverter thực tế")
+    print("="*70)
+    
+    inverters = metadata_db.get_all_inverters()
+    active_inverters = [inv for inv in inverters if inv.is_active]
+    
+    if not active_inverters:
+        print("  [!] Không tìm thấy inverter active nào trong MetadataDB.")
+        return
 
-def interactive_mode():
-    print("\n" + "="*55)
-    print("  FaultStateService — Test Mapping Tool")
-    print("="*55)
-    print("  Nhập 'q' để thoát\n")
+    # Gom nhóm theo brand để tối ưu transport
+    brands = set(inv.brand for inv in active_inverters)
+    transports = {}
+    
+    for brand in brands:
+        print(f"\n📡 Đang kết nối tới brand: {brand}...")
+        t = get_transport(brand)
+        if t:
+            transports[brand] = t
+            print(f"  [OK] Đã kết nối.")
+        else:
+            print(f"  [FAIL] Không thể kết nối tới {brand}.")
 
-    while True:
-        print("-"*55)
-
-        # Chọn brand
-        print(f"Brand ({'/'.join(BRANDS)}): ", end="")
-        brand = input().strip().upper()
-        if brand == "Q":
-            break
-        if brand not in BRANDS:
-            print(f"  [!] Brand không hợp lệ. Dùng: {', '.join(BRANDS)}")
+    for inv in active_inverters:
+        transport = transports.get(inv.brand)
+        if not transport:
             continue
-
-        # Nhập state raw (hex hoặc decimal)
-        print("State raw (reg 32089, decimal hoặc 0xHEX): ", end="")
-        state_str = input().strip()
-        if state_str.lower() == "q":
-            break
+            
+        print(f"\n--- [INV {inv.id}] SN: {inv.serial_number} | Slave ID: {inv.slave_id} ---")
+        
         try:
-            state_raw = int(state_str, 0)  # Hỗ trợ cả 0x... và decimal
-        except ValueError:
-            print("  [!] Giá trị không hợp lệ.")
-            continue
+            driver = get_driver(inv.brand, transport, inv.slave_id)
+            if not driver:
+                print(f"  [!] Không tìm thấy driver cho brand {inv.brand}")
+                continue
+                
+            # Đọc registers trạng thái
+            # Huawei: 32089 (State), 32090 (Fault)
+            print(f"  🔍 Đang đọc data...")
+            raw_data = driver.read_all()
+            
+            if not raw_data:
+                print(f"  ❌ Lỗi: Không phản hồi.")
+                continue
+            
+            raw_state = raw_data.get("state_id", 0)
+            raw_fault = raw_data.get("fault_code", 0)
+            
+            # Mapping
+            mapped_payload = fault_service.get_inverter_status_payload(inv.brand, raw_state, raw_fault)
+            
+            # In kết quả
+            print(f"  [RAW] State: {raw_state} ({hex(raw_state)}) | Fault: {raw_fault}")
+            print(f"  [MAPPED PAYLOAD]:")
+            print(json.dumps(mapped_payload, indent=4, ensure_ascii=False))
+            
+        except Exception as e:
+            print(f"  ❌ Lỗi khi đọc inverter {inv.id}: {e}")
 
-        # Nhập fault code
-        print("Fault code (reg 32090, decimal, 0 = không lỗi): ", end="")
-        fault_str = input().strip()
-        if fault_str.lower() == "q":
-            break
-        try:
-            fault_code = int(fault_str, 0)
-        except ValueError:
-            print("  [!] Giá trị không hợp lệ.")
-            continue
+    # Đóng kết nối
+    for t in transports.values():
+        t.close()
 
-        # Chạy mapping và in JSON
-        result = test_map(brand, state_raw, fault_code)
-        print("\n" + json.dumps(result, indent=2, ensure_ascii=False))
-
-
-def quick_test():
-    """Chạy một số test mẫu nhanh để kiểm tra"""
-    samples = [
-        ("HUAWEI", 0x0200, 0),       # Running, no fault
-        ("HUAWEI", 0x0201, 0),       # Derating, no fault
-        ("HUAWEI", 0x0300, 2021),    # Fault, OVER_TEMPERATURE
-        ("HUAWEI", 0x0200, 2001),    # Running + GRID_OVERVOLTAGE
-        ("SUNGROW", 2, 0),           # Running, no fault
-        ("SUNGROW", 7, 20),          # Fault, OVER_TEMPERATURE
-        ("SUNGROW", 2, 14),          # Running + STRING_FAULT
-    ]
-
-    print("\n" + "="*55)
-    print("  Quick Test — Các mẫu mặc định")
-    print("="*55)
-
-    for brand, state, fault in samples:
-        result = test_map(brand, state, fault)
-        print(f"\n[{brand}] state={hex(state)}, fault={fault}")
-        print(json.dumps(result["output"], indent=2, ensure_ascii=False))
-
+    print("\n" + "="*70)
+    print("  Hoàn tất kiểm tra live.")
+    print("="*70 + "\n")
 
 if __name__ == "__main__":
-    if "--quick" in sys.argv:
-        quick_test()
-    else:
-        interactive_mode()
+    run_live_test()
