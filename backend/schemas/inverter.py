@@ -15,12 +15,13 @@ class InverterCreate:
     rate_dc_kwp: float = 0.0
     rate_ac_kw: float = 0.0
     is_active: bool = True
+    inverter_index: Optional[int] = None
+    strings_per_mppt: Optional[str] = None
     slave_id: int = 1
+    comm_id: Optional[int] = None
     usage_start_at: Optional[str] = None
     usage_end_at: Optional[str] = None
     replaced_by_id: Optional[int] = None
-    inverter_index: Optional[int] = None
-    strings_per_mppt: Optional[str] = None
 
 @dataclass
 class InverterUpdate:
@@ -37,11 +38,12 @@ class InverterUpdate:
     rate_dc_kwp: Optional[float] = None
     rate_ac_kw: Optional[float] = None
     is_active: Optional[bool] = None
+    strings_per_mppt: Optional[str] = None
     slave_id: Optional[int] = None
+    comm_id: Optional[int] = None
     usage_start_at: Optional[str] = None
     usage_end_at: Optional[str] = None
     replaced_by_id: Optional[int] = None
-    strings_per_mppt: Optional[str] = None
 
 @dataclass
 class InverterResponse:
@@ -59,11 +61,12 @@ class InverterResponse:
     rate_dc_kwp: float
     rate_ac_kw: float
     is_active: bool
+    strings_per_mppt: Optional[str] = None
     slave_id: Optional[int] = None
+    comm_id: Optional[int] = None
     server_id: Optional[int] = None
     server_request_id: Optional[int] = None
     sync_status: str = 'pending'
     usage_start_at: Optional[str] = None
     usage_end_at: Optional[str] = None
     replaced_by_id: Optional[int] = None
-    strings_per_mppt: Optional[str] = None

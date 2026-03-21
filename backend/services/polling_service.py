@@ -7,6 +7,7 @@ from typing import Dict, Any, List
 
 from database.sqlite_manager import MetadataDB, RealtimeDB
 from drivers.huawei_sun2000110KTL import HuaweiSUN2000
+from drivers.sungrow_sg110cx import SungrowSG110CXDriver
 from communication.modbus_tcp import ModbusTCP
 from communication.modbus_rtu import ModbusRTU
 from services.normalization_service import NormalizationService
@@ -108,11 +109,7 @@ class PollingService:
                     raw_data["state_name"] = "UNKNOWN"
                     raw_data["mapped_status"] = None
 
-                # Calculate E_monthly
-                e_monthly = self.tracking.update_energy(inv.id, raw_data.get("e_total", 0.0) or 0.0)
-                raw_data["e_monthly"] = e_monthly
-                
-                # Replacement logic
+                # Energy & Replacement Logic
                 read_serial = raw_data.get("serial_number")
                 if read_serial and read_serial != inv.serial_number:
                     self._handle_inverter_replacement(inv, read_serial)
@@ -136,6 +133,7 @@ class PollingService:
                 if self.cache_db:
                     self.cache_db.upsert_latest_realtime(inv.id, project_id, normalized)
                     logger.info(f"Saved Inverter {inv.id} data to CacheDB")
+                
                 # Cập nhật vào database chính để ProjectService có thể lấy cho Telemetry Snapshot
                 self.realtime_db.upsert_latest_realtime(inv.id, project_id, normalized)
                 logger.info(f"Saved Inverter {inv.id} data to RealtimeDB (latest)")

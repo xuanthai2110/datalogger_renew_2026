@@ -39,6 +39,14 @@ class MetadataDB:
         conn.execute("PRAGMA foreign_keys = ON;")
         return conn
 
+    def _ensure_column(self, conn, table_name: str, column_name: str, column_sql: str):
+        columns = {
+            row["name"]
+            for row in conn.execute(f"PRAGMA table_info({table_name})").fetchall()
+        }
+        if column_name not in columns:
+            conn.execute(f"ALTER TABLE {table_name} ADD COLUMN {column_sql}")
+
     def _create_tables(self):
         with self._connect() as conn:
             cursor = conn.cursor()
@@ -80,6 +88,7 @@ class MetadataDB:
                 phase_count INTEGER,
                 mppt_count INTEGER,
                 string_count INTEGER,
+                strings_per_mppt TEXT,
                 capacity_kw REAL,
                 rate_dc_kwp REAL,
                 rate_ac_kw REAL,
@@ -88,13 +97,14 @@ class MetadataDB:
                 usage_start_at TEXT,
                 usage_end_at TEXT,
                 slave_id INTEGER,
+                comm_id INTEGER,
                 project_id INTEGER,
                 server_id INTEGER,
                 server_request_id INTEGER,
                 sync_status TEXT DEFAULT 'pending',
-                strings_per_mppt TEXT,
                 FOREIGN KEY (project_id) REFERENCES projects(id),
-                FOREIGN KEY (replaced_by_id) REFERENCES inverters(id)
+                FOREIGN KEY (replaced_by_id) REFERENCES inverters(id),
+                FOREIGN KEY (comm_id) REFERENCES comm_config(id)
             );
             """)
 
@@ -145,6 +155,9 @@ class MetadataDB:
             CREATE INDEX IF NOT EXISTS idx_inverter_serial
             ON inverters(serial_number);
             """)
+
+            # Keep older metadata.db files compatible with the new inverter schema.
+            self._ensure_column(conn, "inverters", "comm_id", "comm_id INTEGER")
 
     # =========================================================
     # PROJECT API
@@ -216,7 +229,6 @@ class MetadataDB:
                 server_id
             ))
             return server_id
-
 
     def get_project(self, project_id: int) -> Optional[ProjectResponse]:
         with self._connect() as conn:
@@ -417,10 +429,10 @@ class MetadataDB:
                 INSERT INTO inverters (
                     project_id, inverter_index, serial_number, brand, model,
                     firmware_version, phase_count, mppt_count,
-                    string_count, capacity_kw, rate_dc_kwp, rate_ac_kw,
+                    string_count, strings_per_mppt, capacity_kw, rate_dc_kwp, rate_ac_kw,
                     is_active, replaced_by_id,
-                    usage_start_at, usage_end_at, slave_id, strings_per_mppt
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    usage_start_at, usage_end_at, slave_id, comm_id
+                ) VALUES (?, ?, ?, ?, ?, ?,?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, (
                 data_dict.get("project_id"),
                 next_idx,
@@ -431,6 +443,7 @@ class MetadataDB:
                 data_dict.get("phase_count"),
                 data_dict.get("mppt_count"),
                 data_dict.get("string_count"),
+                data_dict.get("strings_per_mppt"),
                 data_dict.get("capacity_kw"),
                 data_dict.get("rate_dc_kwp"),
                 data_dict.get("rate_ac_kw"),
@@ -439,7 +452,7 @@ class MetadataDB:
                 data_dict.get("usage_start_at"),
                 data_dict.get("usage_end_at"),
                 data_dict.get("slave_id"),
-                data_dict.get("strings_per_mppt")
+                data_dict.get("comm_id")
             ))
             return cursor.lastrowid
 
@@ -455,12 +468,12 @@ class MetadataDB:
             conn.execute("""
                 INSERT INTO inverters (
                     id, project_id, inverter_index, serial_number, brand, model,
-                    firmware_version, phase_count, mppt_count,
-                    string_count, capacity_kw, rate_dc_kwp, rate_ac_kw,
+                    firmware_version, phase_count, mppt_count, string_count,
+                    strings_per_mppt, capacity_kw, rate_dc_kwp, rate_ac_kw,
                     is_active, replaced_by_id,
-                    usage_start_at, usage_end_at, slave_id,
-                    server_id, sync_status, strings_per_mppt
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'approved')
+                    usage_start_at, usage_end_at, slave_id, comm_id,
+                    server_id, sync_status
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'approved')
             """, (
                 server_id,
                 data_dict.get("project_id"),
@@ -472,6 +485,7 @@ class MetadataDB:
                 data_dict.get("phase_count"),
                 data_dict.get("mppt_count"),
                 data_dict.get("string_count"),
+                data_dict.get("strings_per_mppt"),
                 data_dict.get("capacity_kw"),
                 data_dict.get("rate_dc_kwp"),
                 data_dict.get("rate_ac_kw"),
@@ -480,6 +494,7 @@ class MetadataDB:
                 data_dict.get("usage_start_at"),
                 data_dict.get("usage_end_at"),
                 data_dict.get("slave_id"),
+                data_dict.get("comm_id"),
                 server_id
             ))
             return server_id

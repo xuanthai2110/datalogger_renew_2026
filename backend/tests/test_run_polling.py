@@ -56,24 +56,26 @@ class MockUploader:
             
             # Ghi file data.json để user kiểm tra (lấy bản ghi cuối cùng hoặc bản ghi đầu tiên tùy ý, 
             # ở đây ta ghi toàn bộ list nếu có nhiều project, hoặc chỉ object nếu là 1)
-            output_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "data.json")
             
             try:
-                # Nếu chỉ có 1 bản ghi (thông thường cho 1 project), ghi trực tiếp object đó
-                # Nếu có nhiều, ghi thành list
-                data_to_save = records[0] if count == 1 else records
+                # records là list các payloads lấy từ outbox.
+                # Mỗi payload từ TelemetryService mới nhất đã là một list [project_object].
+                # Để data.json bắt đầu bằng [ và chuẩn format, ta lấy payload đầu tiên
+                # (thông thường chỉ có 1 dự án được quét mỗi lần snapshot)
+                data_to_save = records[0]
                 
-                with open(output_path, "w", encoding="utf-8") as f:
+                with open(self.output_path, "w", encoding="utf-8") as f:
                     json.dump(data_to_save, f, indent=4, ensure_ascii=False)
-                test_logger.info(f"💾 [FILE] Đã lưu payload vào: {output_path}")
+                test_logger.info(f"💾 [FILE] Đã lưu payload vào: {self.output_path}")
+                
+                # In chi tiết lỗi để check DERATING
+                for project in data_to_save:
+                    for inv in project.get("inverters", []):
+                        sn = inv.get("serial_number")
+                        errs = inv.get("errors", [])
+                        if errs:
+                            test_logger.info(f"   └─ [INV {sn}] Errors: {errs[0]['fault_description']} (Code: {errs[0]['fault_code']})")
             except Exception as e:
-                test_logger.error(f"❌ [FILE] Lỗi khi ghi data.json: {e}")
-
-            # In chi tiết lỗi của từng inverter nếu có
-            for rec in records:
-                inverters = rec.get("inverters", [])
-                for inv in inverters:
-                    sn = inv.get("serial_number", "N/A")
                     errs = inv.get("errors", [])
                     if errs:
                         err_json = json.dumps(errs, indent=4, ensure_ascii=False)

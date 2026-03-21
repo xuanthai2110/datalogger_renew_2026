@@ -21,12 +21,13 @@ class TrackingService:
         self.mppt_max: Dict[int, Dict[int, Dict[str, float]]] = {}
         # {inverter_id: {string_id: max_I}}
         self.string_max: Dict[int, Dict[int, float]] = {}
+        # Theo dõi ngày đã seed max từ DB cho từng inverter
+        self.max_seed_date: Dict[int, date] = {}
         
-        # Fault tracking
-        # {inverter_id: set(last_fault_codes)}
         self.last_fault_map: Dict[int, set] = {}
         
-        self.last_reset_date = date.today()
+        # Initial reset date for state tracking (will be updated on first check_resets)
+        self.last_reset_date: Optional[date] = None
 
     def sync_from_db(self, inverter_id: int):
         """Khởi tạo trạng thái từ DB nếu chưa có trong memory"""
@@ -61,19 +62,70 @@ class TrackingService:
             """, (inverter_id,)).fetchall()
             self.last_fault_map[inverter_id] = {r["fault_code"] for r in rows if r["fault_code"] != 0}
 
+    def _sync_daily_max_from_db(self, inverter_id: int):
+        """
+        Seed max trong ngày từ snapshot mới nhất đã được ghi vào RealtimeDB.
+
+        Các giá trị max mới phát hiện sau đó chỉ được giữ trong RAM cho tới lần
+        save_to_database() tiếp theo ghi snapshot mới vào DB.
+        """
+        today = date.today()
+        if self.max_seed_date.get(inverter_id) == today:
+            return
+
+        self.mppt_max[inverter_id] = {}
+        self.string_max[inverter_id] = {}
+
+        latest_mppts = self.realtime_db.get_latest_mppt_batch(inverter_id)
+        if latest_mppts:
+            try:
+                latest_mppt_date = datetime.fromisoformat(latest_mppts[0].created_at).date()
+                if latest_mppt_date == today:
+                    self.mppt_max[inverter_id] = {
+                        r.mppt_index: {
+                            "Max_V": r.Max_V,
+                            "Max_I": r.Max_I,
+                            "Max_P": r.Max_P,
+                        }
+                        for r in latest_mppts
+                    }
+            except Exception as e:
+                logger.error(f"Error syncing MPPT max from DB for inv {inverter_id}: {e}")
+
+        latest_strings = self.realtime_db.get_latest_string_batch(inverter_id)
+        if latest_strings:
+            try:
+                latest_string_date = datetime.fromisoformat(latest_strings[0].created_at).date()
+                if latest_string_date == today:
+                    self.string_max[inverter_id] = {
+                        r.string_id: r.max_I
+                        for r in latest_strings
+                    }
+            except Exception as e:
+                logger.error(f"Error syncing string max from DB for inv {inverter_id}: {e}")
+
+        self.max_seed_date[inverter_id] = today
+
     def check_resets(self):
         """Reset hàng ngày và hàng tháng"""
         today = date.today()
+        
+        # Lần chạy đầu tiên sau khi khởi tạo
+        if self.last_reset_date is None:
+            self.last_reset_date = today
+            return
+
         if today > self.last_reset_date:
-            logger.info(f"Checking resets for date {today}")
+            logger.info(f"Daily reset triggered: {self.last_reset_date} -> {today}")
             # Reset Max Values hàng ngày
             self.mppt_max.clear()
             self.string_max.clear()
+            self.max_seed_date.clear()
             # last_fault_map không reset vì nó là trạng thái logic
             
             # Reset Energy hàng tháng
             if today.month != self.last_reset_date.month:
-                logger.info("Monthly reset of energy values.")
+                logger.info(f"Monthly reset triggered: {today}")
                 self.e_monthly_map.clear()
             
             self.last_reset_date = today
@@ -103,9 +155,17 @@ class TrackingService:
         return self.e_monthly_map[inverter_id]
 
     def update_max_values(self, project_id: int, inverter_id: int, data: dict, mppt_count: int, string_count: int):
-        """Cập nhật các giá trị MAX và kiểm tra cắm ngược cực"""
+        """
+        Cập nhật các giá trị MAX trong ngày và kiểm tra cắm ngược cực.
+
+        Max được seed từ snapshot mới nhất trong RealtimeDB, sau đó giữ trong
+        RAM cho tới lần save_to_database() tiếp theo ghi snapshot mới.
+        """
+        self._sync_daily_max_from_db(inverter_id)
+
         # MPPT Max & Reverse Polarity check
-        if inverter_id not in self.mppt_max: self.mppt_max[inverter_id] = {}
+        if inverter_id not in self.mppt_max:
+            self.mppt_max[inverter_id] = {}
         for i in range(1, mppt_count + 1):
             v = round(data.get(f"mppt_{i}_voltage", 0.0) or 0.0, 2)
             i_val = round(data.get(f"mppt_{i}_current", 0.0) or 0.0, 2)
@@ -123,7 +183,8 @@ class TrackingService:
                 self.mppt_max[inverter_id][i]["Max_P"] = max(self.mppt_max[inverter_id][i]["Max_P"], p)
 
         # String Max & Reverse Polarity check
-        if inverter_id not in self.string_max: self.string_max[inverter_id] = {}
+        if inverter_id not in self.string_max:
+            self.string_max[inverter_id] = {}
         for i in range(1, string_count + 1):
             s_i = round(data.get(f"string_{i}_current", 0.0) or 0.0, 2)
             

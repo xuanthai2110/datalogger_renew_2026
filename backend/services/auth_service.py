@@ -23,16 +23,11 @@ class AuthService:
         """Trả về access token hợp lệ.
         Nếu chưa có trong RAM → Thử load từ disk.
         Nếu vẫn chưa có → login.
-        """
-        if self.access_token:
-            return self.access_token
-        
-        # Nếu đã có login trước đó nhưng chưa load hoặc hết hạn RAM
+                """
         if not self.access_token:
             self._login()
-            
-        return self.access_token
 
+        return self.access_token
     def refresh_access_token(self) -> bool:
         """Dùng refresh_token để lấy access_token mới.
         Trả về True nếu thành công, False nếu thất bại.
