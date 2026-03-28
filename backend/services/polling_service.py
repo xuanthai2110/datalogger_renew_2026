@@ -21,6 +21,10 @@ class PollingService:
         self.cache_db = cache_db
         self.normalization = NormalizationService()
         self.transports = {}
+        
+        # Caching logic
+        self._config_cache = []
+        self._last_refresh = 0
 
     def _get_transport(self, brand: str):
         if "Huawei" in brand:
