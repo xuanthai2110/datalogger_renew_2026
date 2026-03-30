@@ -3,7 +3,7 @@ import logging
 from datetime import datetime, timezone
 from typing import Dict, Any, List, Optional
 
-from db_manager import MetadataDB, CacheDB
+from database import MetadataDB, CacheDB
 from drivers.huawei_sun2000110KTL import HuaweiSUN2000
 from drivers.sungrow_sg110cx import SungrowSG110CXDriver
 from communication.modbus_tcp import ModbusTCP
