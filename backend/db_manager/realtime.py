@@ -130,3 +130,42 @@ class RealtimeDB(BaseDB):
                 )
             """, (project_id,)).fetchall()
             return [to_dataclass(InverterACRealtimeResponse, r) for r in rows]
+
+    # --- MPPT Realtime API ---
+    def get_latest_mppt_batch(self, inverter_id: int) -> List[mpptRealtimeResponse]:
+        """Lấy danh sách điểm MPPT mới nhất của 1 inverter từ Disk (dùng khi seed)."""
+        with self._connect() as conn:
+            # Lấy bản ghi có created_at mới nhất cho inverter này
+            rows = conn.execute("""
+                SELECT * FROM mppt_realtime
+                WHERE inverter_id = ?
+                AND created_at = (
+                    SELECT MAX(created_at) FROM mppt_realtime WHERE inverter_id = ?
+                )
+            """, (inverter_id, inverter_id)).fetchall()
+            return [to_dataclass(mpptRealtimeResponse, r) for r in rows]
+
+    def post_mppt_batch(self, records: List[mpptRealtimeCreate]):
+        if not records: return
+        values = [(r.project_id, r.inverter_id, r.mppt_index, r.string_on_mppt, r.V_mppt, r.I_mppt, r.P_mppt, r.Max_I, r.Max_V, r.Max_P, r.created_at) for r in records]
+        with self._connect() as conn:
+            conn.executemany("INSERT INTO mppt_realtime (project_id, inverter_id, mppt_index, string_on_mppt, V_mppt, I_mppt, P_mppt, Max_I, Max_V, Max_P, created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?)", values)
+
+    # --- String Realtime API ---
+    def get_latest_string_batch(self, inverter_id: int) -> List[stringRealtimeResponse]:
+        """Lấy danh sách điểm String mới nhất của 1 inverter từ Disk (dùng khi seed)."""
+        with self._connect() as conn:
+            rows = conn.execute("""
+                SELECT * FROM string_realtime
+                WHERE inverter_id = ?
+                AND created_at = (
+                    SELECT MAX(created_at) FROM string_realtime WHERE inverter_id = ?
+                )
+            """, (inverter_id, inverter_id)).fetchall()
+            return [to_dataclass(stringRealtimeResponse, r) for r in rows]
+
+    def post_string_batch(self, records: List[stringRealtimeCreate]):
+        if not records: return
+        values = [(r.project_id, r.inverter_id, r.mppt_id, r.string_id, r.I_string, r.max_I, r.created_at) for r in records]
+        with self._connect() as conn:
+            conn.executemany("INSERT INTO string_realtime (project_id, inverter_id, mppt_id, string_id, I_string, max_I, created_at) VALUES (?,?,?,?,?,?,?)", values)
