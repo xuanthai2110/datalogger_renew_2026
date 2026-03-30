@@ -23,7 +23,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
-from database import MetadataDB
+from backend.database import MetadataDB
 from services.auth_service import AuthService
 from services.setup_service import SetupService
 from models.project import ProjectCreate, ProjectUpdate

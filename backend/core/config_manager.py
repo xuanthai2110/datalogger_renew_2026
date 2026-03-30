@@ -10,8 +10,8 @@ Web UI ghi đè → lưu vào database.
 import logging
 from dataclasses import asdict
 
-from core import config as app_config
-from database import MetadataDB
+from backend.core import config as app_config
+from backend.database import MetadataDB
 from models.comm import CommConfig
 
 logger = logging.getLogger(__name__)

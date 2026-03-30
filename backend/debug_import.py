@@ -13,7 +13,7 @@ print(f"sys.path[0]: {sys.path[0]}")
 try:
     import database
     print(f"Database module found at: {database.__file__}")
-    from database import MetadataDB
+    from backend.database import MetadataDB
     print("MetadataDB imported successfully")
 except Exception as e:
     print(f"Error: {e}")

@@ -1,7 +1,7 @@
 import time
 import logging
 import threading
-from database import RealtimeDB
+from backend.database import RealtimeDB
 from services.uploader_service import UploaderService
 import config
 

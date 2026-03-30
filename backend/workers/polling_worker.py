@@ -1,7 +1,7 @@
 import time
 import logging
 import threading
-from database import MetadataDB, CacheDB
+from backend.database import MetadataDB, CacheDB
 from services.polling_service import PollingService
 import config
 

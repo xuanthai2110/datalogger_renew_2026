@@ -27,7 +27,7 @@ from backend.api.sync_api import router as sync_router
 from backend.database import MetadataDB
 from backend.models.user import UserCreate
 from backend.services.local_auth_utils import hash_password
-from backend.core from core import config as app_config
+from backend.core import config as app_config
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)

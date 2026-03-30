@@ -2,13 +2,13 @@ import time
 import json
 import logging
 import threading
-from database import CacheDB, MetadataDB, RealtimeDB
+from backend.database import CacheDB, MetadataDB, RealtimeDB
 from services.energy_service import EnergyService
 from services.max_tracking_service import MaxTrackingService
 from services.fault_service import FaultService
 from services.telemetry_service import TelemetryService
 from services.uploader_service import UploaderService
-from core import config
+from backend.core import config
 
 logger = logging.getLogger(__name__)
 

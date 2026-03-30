@@ -1,13 +1,13 @@
 import time
 import logging
 import threading
-from database import CacheDB, RealtimeDB
+from backend.database import CacheDB, RealtimeDB
 from services.energy_service import EnergyService
 from models.realtime import (
     InverterACRealtimeCreate, mpptRealtimeCreate, 
     stringRealtimeCreate, ProjectRealtimeCreate
 )
-from core import config
+from backend.core import config
 
 logger = logging.getLogger(__name__)
 

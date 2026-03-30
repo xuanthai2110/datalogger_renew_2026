@@ -4,28 +4,35 @@ import logging
 import time
 from datetime import datetime
 
-# 1. Thêm đường dẫn gốc của project vào sys.path
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-print(sys.path)
-from backend.database import MetadataDB, CacheDB, RealtimeDB
-from backend.polling_worker import PollingWorker
-from backend.logic_worker import LogicWorker
-from backend.persistence_worker import PersistenceWorker
-from backend.uploader_worker import UploaderWorker
-from backend.fault_service import FaultService
-from core import config
+# 1. Thêm PROJECT ROOT vào sys.path để hỗ trợ absolute imports (backend.xxx)
+# __file__ = e:\datalogger_project_2102\backend\scripts\run_polling.py
+# current_dir = backend/scripts
+# parent = backend
+# grand_parent = e:\datalogger_project_2102 (ROOT)
+PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+if PROJECT_ROOT not in sys.path:
+    sys.path.insert(0, PROJECT_ROOT)
 
-# 2. Cấu hình Logging tập trung (Sau này sẽ move vào core/logger.py)
+# 2. Imports chuẩn từ backend package
+from backend.database import MetadataDB, CacheDB, RealtimeDB
+from backend.workers.polling_worker import PollingWorker
+from backend.workers.logic_worker import LogicWorker
+from backend.workers.persistence_worker import PersistenceWorker
+from backend.workers.uploader_worker import UploaderWorker
+from backend.services.fault_service import FaultService
+from backend.core import config
+
+# Cấu hình Logging
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     handlers=[logging.StreamHandler(), logging.FileHandler("polling.log")]
 )
-
 logger = logging.getLogger("Launcher")
 
 def main():
     try:
+        logger.info(f"System Path: {sys.path[:3]}") # Debug
         logger.info("Starting Datalogger 6-Threads Modular Architecture...")
         
         # 1. Khởi tạo Database Layer
@@ -36,35 +43,27 @@ def main():
         # 2. Khởi tạo Logic Services
         fault_service = FaultService(realtime_db, metadata_db)
         
-        # 3. KHỞI CHẠY CÁC WORKERS (THREADS)
-        
-        # L1: Polling Worker (10s/lần)
+        # 3. KHỞI CHẠY WORKERS
         poll_worker = PollingWorker(metadata_db, cache_db, config.POLL_INTERVAL)
         poll_worker.start()
         
-        # L2: Logic Worker (1s/lần - Xử lý E, Max, Fault + Instant Trigger)
         logic_worker = LogicWorker(cache_db, metadata_db, realtime_db, fault_service)
         logic_worker.start()
         
-        # L3: Persistence Worker (5p/lần - Snapshot RAM -> Disk)
         persist_worker = PersistenceWorker(cache_db, realtime_db, logic_worker.energy_service, config.SNAPSHOT_INTERVAL)
         persist_worker.start()
         
-        # L4: Uploader Worker (5p/lần - Periodic Upload)
         upload_worker = UploaderWorker(realtime_db, config.SNAPSHOT_INTERVAL)
         upload_worker.start()
         
-        logger.info("All workers started successfully. Monitoring mode active.")
-        
-        # Luồng chính giữ cho chương trình chạy và có thể in Dashboard định kỳ
+        logger.info("All workers active.")
         while True:
-            # Dashboard logic could go here
             time.sleep(10)
 
     except KeyboardInterrupt:
-        logger.info("Stopping Datalogger...")
+        logger.info("Stopping...")
     except Exception as e:
-        logger.error(f"Critical error in Launcher: {e}", exc_info=True)
+        logger.error(f"Critical error: {e}", exc_info=True)
         sys.exit(1)
 
 if __name__ == "__main__":

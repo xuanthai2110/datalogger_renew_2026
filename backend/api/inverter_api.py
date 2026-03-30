@@ -4,11 +4,11 @@ web/routes/inverter_route.py — CRUD routes cho Inverters
 
 from fastapi import APIRouter, Body
 from fastapi.responses import JSONResponse
-from database import MetadataDB
+from backend.database import MetadataDB
 from models.inverter import InverterCreate, InverterUpdate
 from dataclasses import asdict, fields
 import logging
-from core import config as app_config
+from backend.core import config as app_config
 
 router = APIRouter(tags=["inverters"])
 logger = logging.getLogger(__name__)

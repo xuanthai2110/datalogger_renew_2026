@@ -3,13 +3,13 @@ import logging
 from datetime import datetime, timezone
 from typing import Dict, Any, List, Optional
 
-from database import MetadataDB, CacheDB
+from backend.database import MetadataDB, CacheDB
 from drivers.huawei_sun2000110KTL import HuaweiSUN2000
 from drivers.sungrow_sg110cx import SungrowSG110CXDriver
 from communication.modbus_tcp import ModbusTCP
 from communication.modbus_rtu import ModbusRTU
 from services.normalization_service import NormalizationService
-from core import config
+from backend.core import config
 
 logger = logging.getLogger(__name__)
 
