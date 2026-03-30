@@ -3,12 +3,12 @@ web/routes/project_route.py — CRUD routes cho Projects
 """
 from fastapi import APIRouter, Depends, Body
 from fastapi.responses import JSONResponse
-from database.sqlite_manager import MetadataDB
-from schemas.project import ProjectCreate, ProjectResponse
+from db_manager import MetadataDB
+from models.project import ProjectCreate, ProjectResponse
 from backend.api.auth_api import get_current_user_id
 from dataclasses import asdict, fields
 import logging
-import config as app_config
+from core import config as app_config
 
 router = APIRouter(tags=["projects"])
 logger = logging.getLogger(__name__)

@@ -23,10 +23,10 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
-from database.sqlite_manager import MetadataDB
+from db_manager import MetadataDB
 from services.auth_service import AuthService
 from services.setup_service import SetupService
-from schemas.project import ProjectCreate, ProjectUpdate
+from models.project import ProjectCreate, ProjectUpdate
 from drivers.huawei_sun2000110KTL import HuaweiSUN2000
 from communication.modbus_tcp import ModbusTCP
 import config

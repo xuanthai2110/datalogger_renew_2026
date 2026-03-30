@@ -5,7 +5,7 @@ import sys
 BASE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 sys.path.append(BASE_DIR)
 
-from database.sqlite_manager import RealtimeDB
+from db_manager import RealtimeDB
 from config import REALTIME_DB
 
 def test_realtime():

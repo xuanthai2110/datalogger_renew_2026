@@ -2,9 +2,9 @@ import logging
 import json
 from datetime import datetime
 from typing import Dict, Set, List, Tuple
-from database.sqlite_manager import RealtimeDB, MetadataDB
+from db_manager import RealtimeDB, MetadataDB
 from services.fault_state_service import FaultStateService
-from schemas.realtime import InverterErrorCreate
+from models.realtime import InverterErrorCreate
 
 logger = logging.getLogger(__name__)
 

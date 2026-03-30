@@ -1,7 +1,7 @@
 import time
 import logging
 from core import config
-from database import MetadataDB, RealtimeDB, CacheDB
+from db_manager import MetadataDB, RealtimeDB, CacheDB
 from workers.polling_worker import PollingWorker
 from workers.logic_worker import LogicWorker
 from services.fault_service import FaultService

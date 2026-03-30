@@ -1,10 +1,10 @@
 from fastapi import APIRouter, Depends, HTTPException, Body
-from database.sqlite_manager import MetadataDB
-from schemas.comm import CommConfig
+from db_manager import MetadataDB
+from models.comm import CommConfig
 from backend.api.auth_api import get_db
 from typing import List
 import logging
-import config as app_config
+from core import config as app_config
 
 router = APIRouter(prefix="/api/comm", tags=["comm"])
 logger = logging.getLogger(__name__)

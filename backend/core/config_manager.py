@@ -10,9 +10,9 @@ Web UI ghi đè → lưu vào database.
 import logging
 from dataclasses import asdict
 
-import config as app_config
-from database.sqlite_manager import MetadataDB
-from schemas.comm import CommConfig
+from core import config as app_config
+from db_manager import MetadataDB
+from models.comm import CommConfig
 
 logger = logging.getLogger(__name__)
 
@@ -85,7 +85,7 @@ def save_config(data: dict):
             logger.info("Comm config saved to metadata.db")
             
         if "project" in data:
-            from schemas.project import ProjectCreate
+            from models.project import ProjectCreate
             proj_data = data["project"]
             
             proj_create = ProjectCreate(

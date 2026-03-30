@@ -19,7 +19,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
-from database.sqlite_manager import MetadataDB
+from db_manager import MetadataDB
 from services.auth_service import AuthService
 from services.setup_service import SetupService
 import config

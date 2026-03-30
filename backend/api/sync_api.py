@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
-from database.sqlite_manager import MetadataDB
+from db_manager import MetadataDB
 from backend.api.auth_api import get_current_user, get_db
-import config as app_config
+from core import config as app_config
 import requests
 import logging
 from dataclasses import asdict

@@ -2,9 +2,9 @@ import time
 import logging
 import threading
 from datetime import datetime
-from database.sqlite_manager import CacheDB, RealtimeDB
+from db_manager import CacheDB, RealtimeDB
 from services.energy_service import EnergyService
-from schemas.realtime import InverterACRealtimeCreate, mpptRealtimeCreate, stringRealtimeCreate
+from models.realtime import InverterACRealtimeCreate, mpptRealtimeCreate, stringRealtimeCreate
 import config
 
 logger = logging.getLogger(__name__)

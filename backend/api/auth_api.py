@@ -1,8 +1,8 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
-from database.sqlite_manager import MetadataDB, RealtimeDB, CacheDB
+from db_manager import MetadataDB, RealtimeDB, CacheDB
 from services.local_auth_utils import create_access_token, create_refresh_token, verify_password, decode_token
-import config as app_config
+from core import config as app_config
 from pydantic import BaseModel
 from typing import Optional
 

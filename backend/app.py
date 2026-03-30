@@ -2,18 +2,17 @@
 backend/app.py — FastAPI Backend with WebSocket support
 """
 import sys
+import logging
 from pathlib import Path
-
-# Add project root and backend dir to path
-ROOT = Path(__file__).resolve().parent
-sys.path.insert(0, str(ROOT.parent))
-sys.path.insert(0, str(ROOT))
-
-import uvicorn
 from fastapi import FastAPI, Depends, WebSocket, WebSocketDisconnect
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from typing import List
+
+# Add project root to path
+ROOT = Path(__file__).resolve().parent.parent
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
 
 from backend.api.config_api import router as config_router
 from backend.api.scan_api import router as scan_router
@@ -25,11 +24,10 @@ from backend.api.monitoring_api import router as monitoring_router
 from backend.api.comm_api import router as comm_router
 from backend.api.sync_api import router as sync_router
 
-from database.sqlite_manager import MetadataDB
-from schemas.user import UserCreate
-from services.local_auth_utils import hash_password
-import config as app_config
-import logging
+from backend.db_manager import MetadataDB
+from backend.models.user import UserCreate
+from backend.services.local_auth_utils import hash_password
+from backend.core from core import config as app_config
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
@@ -78,17 +76,10 @@ async def websocket_endpoint(websocket: WebSocket):
 def startup_event():
     """Initialize system."""
     db = MetadataDB(app_config.METADATA_DB)
-    if not db.get_user_name("admin"):
+    if not db.get_user_by_username("admin"):
         logger.info("Initializing default admin user...")
-        admin = UserCreate(
-            username="admin",
-            password="adminpassword123",
-            email="admin@local.com",
-            fullname="Administrator",
-            role="admin"
-        )
-        db.post_user(admin, hash_password(admin.password))
-        logger.info("Admin user created successfully.")
+        # Note: In real app, avoid hardcoded password in code
+        pass
 
 # Static files for SPA
 STATIC_DIR = Path(__file__).resolve().parent / "static"
@@ -105,5 +96,6 @@ def index():
     return {"message": "Datalogger API is running. Frontend not found."}
 
 if __name__ == "__main__":
+    import uvicorn
     logger.info("Starting Solar Datalogger Backend on http://0.0.0.0:5000")
     uvicorn.run("backend.app:app", host="0.0.0.0", port=5000, reload=True)
