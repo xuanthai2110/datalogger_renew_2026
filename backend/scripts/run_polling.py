@@ -6,12 +6,13 @@ from datetime import datetime
 
 # 1. Thêm đường dẫn gốc của project vào sys.path
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from database import MetadataDB, CacheDB, RealtimeDB
-from polling_worker import PollingWorker
-from logic_worker import LogicWorker
-from persistence_worker import PersistenceWorker
-from uploader_worker import UploaderWorker
-from fault_service import FaultService
+print(sys.path)
+from backend.database import MetadataDB, CacheDB, RealtimeDB
+from backend.polling_worker import PollingWorker
+from backend.logic_worker import LogicWorker
+from backend.persistence_worker import PersistenceWorker
+from backend.uploader_worker import UploaderWorker
+from backend.fault_service import FaultService
 from core import config
 
 # 2. Cấu hình Logging tập trung (Sau này sẽ move vào core/logger.py)
