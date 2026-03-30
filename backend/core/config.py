@@ -28,8 +28,6 @@ else:
 # API
 # ===========================================================
 API_BASE_URL = "https://api.hirubicsolar.io.vn"
-API_USERNAME = "nbc"
-API_PASSWORD = "nbc"
 DEV_MODE     = True
 
 
