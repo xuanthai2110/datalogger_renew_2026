@@ -5,7 +5,7 @@ Refactored to support background scanning and cancellation.
 from fastapi import APIRouter, Body, BackgroundTasks
 from fastapi.responses import JSONResponse
 from backend.config_manager import load_config
-from db_manager import MetadataDB
+from database import MetadataDB
 from models.inverter import InverterCreate
 import logging
 import time

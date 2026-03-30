@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, Body
-from db_manager import MetadataDB
+from database import MetadataDB
 from models.comm import CommConfig
 from backend.api.auth_api import get_db
 from typing import List

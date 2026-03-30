@@ -11,7 +11,7 @@ import logging
 from dataclasses import asdict
 
 from core import config as app_config
-from db_manager import MetadataDB
+from database import MetadataDB
 from models.comm import CommConfig
 
 logger = logging.getLogger(__name__)

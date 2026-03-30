@@ -19,7 +19,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
-from db_manager import MetadataDB
+from database import MetadataDB
 from services.setup_service import SetupService
 from models.project import ProjectCreate, ProjectUpdate
 from drivers.huawei_sun2000110KTL import HuaweiSUN2000

@@ -2,7 +2,7 @@ import logging
 import json
 from datetime import datetime
 from typing import Dict, Set, List, Tuple
-from db_manager import RealtimeDB, MetadataDB
+from database import RealtimeDB, MetadataDB
 from services.fault_state_service import FaultStateService
 from models.realtime import InverterErrorCreate
 

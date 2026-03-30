@@ -6,9 +6,9 @@ from datetime import datetime
 
 # 1. Thêm đường dẫn gốc của project vào sys.path
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from backend.db_manager.metadata import MetadataDB
-from backend.db_manager.cache import CacheDB
-from backend.db_manager.realtime import RealtimeDB
+from backend.database.metadata import MetadataDB
+from backend.database.cache import CacheDB
+from backend.database.realtime import RealtimeDB
 from workers.polling_worker import PollingWorker
 from workers.logic_worker import LogicWorker
 from workers.persistence_worker import PersistenceWorker
