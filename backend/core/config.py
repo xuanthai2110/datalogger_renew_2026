@@ -11,7 +11,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # ===========================================================
 # PATHS
 # ===========================================================
-DATABASE_DIR = BASE_DIR / "db_manager"
+DATABASE_DIR = BASE_DIR / "db_manager" / "data"
 DATABASE_DIR.mkdir(parents=True, exist_ok=True)   # tự tạo nếu chưa có
 
 METADATA_DB    = str(DATABASE_DIR / "metadata.db")
