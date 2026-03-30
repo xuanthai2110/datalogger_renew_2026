@@ -113,6 +113,11 @@ class CacheDB(BaseDB):
             """, (inverter_id, project_id, status_code, fault_code, status_text, fault_text, fault_json, now_str))
 
     # --- MPPT ---
+    def get_all_mppt_cache(self) -> List[dict]:
+        with self._connect() as conn:
+            rows = conn.execute("SELECT * FROM mppt_cache").fetchall()
+            return [dict(r) for r in rows]
+
     def get_mppt_cache_by_inverter(self, inverter_id: int) -> List[dict]:
         with self._connect() as conn:
             rows = conn.execute(
@@ -140,6 +145,11 @@ class CacheDB(BaseDB):
                   now_str))
 
     # --- String ---
+    def get_all_string_cache(self) -> List[dict]:
+        with self._connect() as conn:
+            rows = conn.execute("SELECT * FROM string_cache").fetchall()
+            return [dict(r) for r in rows]
+
     def get_string_cache_by_inverter(self, inverter_id: int) -> List[dict]:
         with self._connect() as conn:
             rows = conn.execute(
