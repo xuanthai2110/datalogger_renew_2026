@@ -60,7 +60,7 @@ class SetupService:
         if not token: return False
 
         try:
-            # Server trả về dạng {"data": [{"project": {...}, "telemetry": ...}]}
+            # 1. So khớp Project
             url = f"{API_BASE_URL}/api/projects/?telemetry=false"
             headers = {"Authorization": f"Bearer {token}"}
             resp = requests.get(url, headers=headers, timeout=10)
@@ -75,12 +75,26 @@ class SetupService:
                     break
             
             if matched_proj_data:
-                server_id = matched_proj_data.get("id")
-                self.project_svc.update_project_sync(project_id, server_id=server_id, status='approved')
-                logger.info(f"[Sync] Auto-matched project {project_id} -> Server ID {server_id}")
+                server_proj_id = matched_proj_data.get("id")
+                self.project_svc.update_project_sync(project_id, server_id=server_proj_id, status='approved')
+                logger.info(f"[Sync] Auto-matched project {project_id} -> Server ID {server_proj_id}")
                 
-                # Bonus: Nếu server trả về inverters trong project (tùy API thiết kế)
-                # Ở đây chúng ta tạm thời chỉ khớp Project. Inverter sẽ khớp riêng hoặc Request sau.
+                # 2. Thử so khớp Inverters của project này
+                # Giả định server có endpoint lấy inverters hoặc lọc theo project_id server
+                inv_url = f"{API_BASE_URL}/api/inverters/?telemetry=false" # Lấy hết hoặc thêm filter nếu server hỗ trợ
+                inv_resp = requests.get(inv_url, headers=headers, timeout=10)
+                if inv_resp.status_code == 200:
+                    server_invs = inv_resp.json().get("data", [])
+                    local_invs = self.project_svc.get_inverters_by_project(project_id)
+                    
+                    for li in local_invs:
+                        for si_item in server_invs:
+                            si = si_item.get("inverter", si_item) # Support both nested and flat
+                            if si.get("serial_number") == li.serial_number:
+                                self.project_svc.update_inverter_sync(li.id, server_id=si.get("id"), status='approved')
+                                logger.info(f"[Sync] Auto-matched inverter {li.serial_number} -> Server ID {si.get('id')}")
+                                break
+                
                 return True
         except Exception as e:
             logger.error(f"[Sync] Pre-sync error: {e}")

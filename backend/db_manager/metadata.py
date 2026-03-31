@@ -101,6 +101,9 @@ class MetadataDB(BaseDB):
                 slave_id_end INTEGER
             );
             """)
+            # Đảm bảo cột sync_status tồn tại (Migration cho hệ thống cũ)
+            self._ensure_column(conn, "projects", "sync_status", "sync_status TEXT DEFAULT 'pending'")
+            self._ensure_column(conn, "inverters", "sync_status", "sync_status TEXT DEFAULT 'pending'")
             self._ensure_column(conn, "inverters", "comm_id", "comm_id INTEGER")
 
     # --- Project API ---
@@ -180,6 +183,7 @@ class MetadataDB(BaseDB):
             conn.execute(f"UPDATE projects SET {', '.join(fields)} WHERE id=?", tuple(values))
 
     def update_project_sync(self, project_id: int, server_id: Optional[int] = None, server_request_id: Optional[int] = None, status: str = 'pending'):
+        logger.info(f"[MetadataDB] Updating project {project_id} sync status to {status} (server_id={server_id})")
         with self._connect() as conn:
             conn.execute("""
                 UPDATE projects 
