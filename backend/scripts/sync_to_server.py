@@ -19,9 +19,10 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
-from backend.db_manager import MetadataDB
+from backend.db_manager import MetadataDB, RealtimeDB
 from backend.services.auth_service import AuthService
 from backend.services.setup_service import SetupService
+from backend.services.project_service import ProjectService
 from backend.core import config
 
 # Cấu hình logging
@@ -31,8 +32,11 @@ logger = logging.getLogger(__name__)
 def main():
     # 1. Khởi tạo DB & Services
     meta_db = MetadataDB(config.METADATA_DB)
+    realtime_db = RealtimeDB(config.REALTIME_DB)
+    project_svc = ProjectService(metadata_db=meta_db, realtime_db=realtime_db)
+    
     auth_svc = AuthService()
-    setup_svc = SetupService(auth_svc, meta_db)
+    setup_svc = SetupService(auth_svc, project_service=project_svc)
     
     print("\n=== [STEP 1] CHECKING LOCAL DATA ===")
     project_existing = setup_svc.get_local_project()
@@ -45,7 +49,7 @@ def main():
     print(f"ℹ️ Đang xử lý project: {project_existing.name} (ID Local: {project_id})")
 
     # Kiểm tra danh sách inverter local
-    inverters = meta_db.get_inverters_by_project(project_id)
+    inverters = project_svc.get_inverters_by_project(project_id)
     if not inverters:
         print("⚠️ Cảnh báo: Chưa có inverters nào được lưu local. Sẽ chỉ đồng bộ Project.")
     else:
@@ -61,7 +65,7 @@ def main():
         print(f"✅ Dự án đã được DUYỆT trên Server (Server ID: {server_project_id}).")
     else:
         # Kiểm tra trạng thái sync sau khi gọi sync_project_to_server
-        fresh_project = meta_db.get_project(project_id)
+        fresh_project = project_svc.get_project(project_id)
         status = getattr(fresh_project, 'sync_status', 'pending')
         req_id = getattr(fresh_project, 'server_request_id', None)
         
@@ -79,7 +83,7 @@ def main():
         setup_svc.sync_inverters_to_server(project_id)
         
         # Thống kê trạng thái sau khi đồng bộ
-        fresh_inverters = meta_db.get_inverters_by_project(project_id)
+        fresh_inverters = project_svc.get_inverters_by_project(project_id)
         approved_count = sum(1 for inv in fresh_inverters if getattr(inv, 'sync_status', '') == 'approved')
         pending_count = sum(1 for inv in fresh_inverters if getattr(inv, 'sync_status', '') == 'pending')
         

@@ -23,9 +23,10 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
-from backend.db_manager import MetadataDB
+from backend.db_manager import MetadataDB, RealtimeDB
 from backend.services.auth_service import AuthService
 from backend.services.setup_service import SetupService
+from backend.services.project_service import ProjectService
 from backend.models.project import ProjectCreate, ProjectUpdate
 from backend.drivers.huawei_sun2000110KTL import HuaweiSUN2000
 from backend.communication.modbus_tcp import ModbusTCP
@@ -38,8 +39,11 @@ logger = logging.getLogger(__name__)
 def main():
     # 1. Khởi tạo DB & Services
     meta_db = MetadataDB(config.METADATA_DB)
+    realtime_db = RealtimeDB(config.REALTIME_DB)
+    project_svc = ProjectService(metadata_db=meta_db, realtime_db=realtime_db)
+    
     auth_svc = AuthService()
-    setup_svc = SetupService(auth_svc, meta_db)
+    setup_svc = SetupService(auth_svc, project_service=project_svc)
     
     print("\n" + "="*50)
     print("      SOLAR DATALOGGER - COMPREHENSIVE SETUP")
@@ -65,7 +69,7 @@ def main():
         }
         project_data.update(config.PROJECT_INFO)
         new_project = ProjectCreate(**project_data)
-        project_id = meta_db.post_project(new_project)
+        project_id = project_svc.upsert_project(new_project)
         print(f"✅ Đã lưu Project local (ID: {project_id})")
     else:
         project_id = project_existing.id
@@ -85,7 +89,7 @@ def main():
         
         # Cập nhật lại số lượng inverter thực tế
         update_data = ProjectUpdate(id=project_id, inverter_count=len(found_ids))
-        meta_db.patch_project(project_id, update_data)
+        project_svc.update_project(project_id, update_data)
         print(f"✅ Đã quét và lưu {len(found_ids)} inverters.")
     else:
         print(f"❌ Không thể kết nối tới {HOST}:{PORT}. Bỏ qua bước quét inverter.")
@@ -101,19 +105,19 @@ def main():
     if server_project_id:
         print(f"✅ Dự án đã được DUYỆT trên Server (Server ID: {server_project_id}).")
     else:
-        fresh_project = meta_db.get_project(project_id)
+        fresh_project = project_svc.get_project(project_id)
         if getattr(fresh_project, 'server_request_id', None):
             print(f"🕒 Project Request đã được gửi (ID: {fresh_project.server_request_id}). Đang chờ Admin phê duyệt.")
         else:
             print("⚠️ Cảnh báo: Gửi Project Request thất bại. Vui lòng kiểm tra kết nối mạng/API.")
 
     # 2.2 Đồng bộ Inverters (Gửi danh sách thiết bị linked với project lên Server)
-    inverters = meta_db.get_inverters_by_project(project_id)
+    inverters = project_svc.get_inverters_by_project(project_id)
     if inverters:
         print("\nĐang gửi danh sách Inverters lên server...")
         setup_svc.sync_inverters_to_server(project_id)
         
-        fresh_inverters = meta_db.get_inverters_by_project(project_id)
+        fresh_inverters = project_svc.get_inverters_by_project(project_id)
         approved_count = sum(1 for inv in fresh_inverters if getattr(inv, 'sync_status', '') == 'approved')
         pending_count = sum(1 for inv in fresh_inverters if getattr(inv, 'sync_status', '') == 'pending')
         

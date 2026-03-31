@@ -1,16 +1,17 @@
 import time
 import logging
 import threading
-from backend.db_manager import MetadataDB, CacheDB
+from backend.db_manager import CacheDB
 from backend.services.polling_service import PollingService
+from backend.services.project_service import ProjectService
 from backend.core import config
 
 logger = logging.getLogger(__name__)
 
 class PollingWorker(threading.Thread):
-    def __init__(self, metadata_db: MetadataDB, cache_db: CacheDB, interval: float = 10.0):
+    def __init__(self, project_svc: ProjectService, cache_db: CacheDB, interval: float = 10.0):
         super().__init__()
-        self.service = PollingService(metadata_db, cache_db)
+        self.service = PollingService(project_svc, cache_db)
         self.interval = interval
         self.daemon = True
         self._stop_event = threading.Event()

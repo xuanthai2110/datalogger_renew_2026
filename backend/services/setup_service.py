@@ -9,9 +9,9 @@ from backend.models.inverter import InverterCreate, InverterUpdate
 logger = logging.getLogger(__name__)
 
 class SetupService:
-    def __init__(self, auth_service, metadata_db):
+    def __init__(self, auth_service, project_service):
         self.auth = auth_service
-        self.metadata_db = metadata_db
+        self.project_svc = project_service
 
     def scan_inverters(self, transport, project_id: int, driver_class) -> list[int]:
         """
@@ -33,9 +33,8 @@ class SetupService:
                     
                     if info and info.get("is_active"):
                         logger.info(f"[Setup] Found active inverter at Slave ID {slave_id}: {info['serial_number']}")
-                        info["project_id"] = project_id
                         inv_data = InverterCreate(**info)
-                        local_id = self.metadata_db.upsert_inverter(inv_data)
+                        local_id = self.project_svc.upsert_inverter(inv_data)
                         found_ids.append(local_id)
                         success = True
                         break
@@ -62,7 +61,7 @@ class SetupService:
            - Server trả về 'id' (Request ID), lưu lại local dưới dạng 'pending'.
            - Nếu lỗi 409 (đã tồn tại) → Đánh dấu local là 'approved' để tiếp tục đồng bộ inverters.
         """
-        local_project = self.metadata_db.get_project(project_id)
+        local_project = self.project_svc.get_project(project_id)
         if not local_project: return None
 
         # Nếu đã có server_id thật, coi như xong bước setup cơ bản
@@ -86,7 +85,7 @@ class SetupService:
                     status = data.get("status")
                     if status == "approved":
                         server_id = data.get("approved_project_id")
-                        self.metadata_db.update_project_sync(project_id, server_id=server_id, status='approved')
+                        self.project_svc.update_project_sync(project_id, server_id=server_id, status='approved')
                         logger.info(f"[Sync] Project Request {req_id} APPROVED -> Project ID {server_id}")
                         return server_id
                     elif status == "rejected":
@@ -118,13 +117,13 @@ class SetupService:
                     print(f"DEBUG Project Sync SUCCESS Response: {req_data}")
                     logger.info(f"[Sync] Project Request SUCCESS. Data: {req_data}")
                     new_req_id = req_data.get("id")
-                    self.metadata_db.update_project_sync(project_id, server_request_id=new_req_id, status='pending')
+                    self.project_svc.update_project_sync(project_id, server_request_id=new_req_id, status='pending')
                     logger.info(f"[Sync] Project Request created: ID {new_req_id}")
                     return None # Chờ duyệt
                 elif resp.status_code == 409:
                     logger.info(f"[Sync] Project already exists on server (409)")
                     # Mark as approved so UI shows it's okay
-                    self.metadata_db.update_project_sync(project_id, status='approved')
+                    self.project_svc.update_project_sync(project_id, status='approved')
                     
                     # Try to fetch existing project ID
                     try:
@@ -139,7 +138,7 @@ class SetupService:
                                     existing_id = proj_data.get('id')
                                     if existing_id:
                                         logger.info(f"[Sync] Recovered existing Project ID {existing_id} for meter {local_project.elec_meter_no}")
-                                        self.metadata_db.update_project_sync(project_id, server_id=existing_id, status='approved')
+                                        self.project_svc.update_project_sync(project_id, server_id=existing_id, status='approved')
                                         return existing_id
                     except Exception as e:
                         logger.error(f"[Sync] Error fetching existing project details: {e}")
@@ -147,9 +146,9 @@ class SetupService:
                     try:
                         req_data = resp.json()
                         if "server_id" in req_data:
-                             self.metadata_db.update_project_sync(project_id, server_id=req_data["server_id"], status='approved')
+                             self.project_svc.update_project_sync(project_id, server_id=req_data["server_id"], status='approved')
                         elif "id" in req_data:
-                             self.metadata_db.update_project_sync(project_id, server_request_id=req_data["id"], status='approved')
+                             self.project_svc.update_project_sync(project_id, server_request_id=req_data["id"], status='approved')
                     except Exception: pass
                     return None
             except Exception as e:
@@ -166,10 +165,10 @@ class SetupService:
         3. Liên kết: Gửi kèm 'project_id' (nếu đã duyệt) hoặc 'project_request_id' để server tự map.
         4. Xử lý lỗi 409 (đã tồn tại): Đánh dấu local là 'approved' để có thể gửi dữ liệu telemetry sau này.
         """
-        local_project = self.metadata_db.get_project(project_id)
+        local_project = self.project_svc.get_project(project_id)
         if not local_project: return 0
 
-        local_inverters = self.metadata_db.get_inverters_by_project(project_id)
+        local_inverters = self.project_svc.get_inverters_by_project(project_id)
         token = self.auth.get_access_token()
         if not token: return 0
         headers = {"Authorization": f"Bearer {token}"}
@@ -192,7 +191,7 @@ class SetupService:
                         data = resp.json()
                         if data.get("status") == "approved":
                             server_id = data.get("approved_inverter_id")
-                            self.metadata_db.update_inverter_sync(inv.id, server_id=server_id, status='approved')
+                            self.project_svc.update_inverter_sync(inv.id, server_id=server_id, status='approved')
                             logger.info(f"[Sync] Inverter {inv.serial_number} APPROVED -> ID {server_id}")
                             synced_count += 1
                         else:
@@ -235,13 +234,13 @@ class SetupService:
                         print(f"DEBUG Inverter {inv.serial_number} sync SUCCESS Response: {resp_data}")
                         logger.info(f"[Sync] Inverter {inv.serial_number} SUCCESS. Data: {resp_data}")
                         new_req_id = resp_data.get("id")
-                        self.metadata_db.update_inverter_sync(inv.id, server_request_id=new_req_id, status='pending')
+                        self.project_svc.update_inverter_sync(inv.id, server_request_id=new_req_id, status='pending')
                         logger.info(f"[Sync] Inverter Request created for {inv.serial_number}: ID {new_req_id}")
                         synced_count += 1
                     elif resp.status_code == 409:
                         logger.info(f"[Sync] Inverter {inv.serial_number} already exists (409). Body: {resp.text}")
                         # Mark as approved so UI shows it's okay
-                        self.metadata_db.update_inverter_sync(inv.id, status='approved')
+                        self.project_svc.update_inverter_sync(inv.id, status='approved')
                         
                         # Try to fetch existing inverter ID
                         try:
@@ -256,7 +255,7 @@ class SetupService:
                                         existing_id = inv_data.get('id')
                                         if existing_id:
                                             logger.info(f"[Sync] Recovered existing Inverter ID {existing_id} for serial {inv.serial_number}")
-                                            self.metadata_db.update_inverter_sync(inv.id, server_id=existing_id, status='approved')
+                                            self.project_svc.update_inverter_sync(inv.id, server_id=existing_id, status='approved')
                                             synced_count += 1
                                             continue  # Skip the fallback JSON parsing
                         except Exception as e:
@@ -265,11 +264,11 @@ class SetupService:
                         try:
                             resp_data = resp.json()
                             if "server_id" in resp_data:
-                                self.metadata_db.update_inverter_sync(inv.id, server_id=resp_data["server_id"], status='approved')
+                                self.project_svc.update_inverter_sync(inv.id, server_id=resp_data["server_id"], status='approved')
                             elif "id" in resp_data:
-                                self.metadata_db.update_inverter_sync(inv.id, server_request_id=resp_data["id"], status='approved')
+                                self.project_svc.update_inverter_sync(inv.id, server_request_id=resp_data["id"], status='approved')
                             elif "existing_id" in resp_data:
-                                self.metadata_db.update_inverter_sync(inv.id, server_id=resp_data["existing_id"], status='approved')
+                                self.project_svc.update_inverter_sync(inv.id, server_id=resp_data["existing_id"], status='approved')
                         except Exception: pass
                         synced_count += 1
                 except Exception as e:

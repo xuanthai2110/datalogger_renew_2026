@@ -17,16 +17,14 @@ class Token(BaseModel):
 class RefreshRequest(BaseModel):
     refresh_token: str
 
-def get_db():
-    return MetadataDB(app_config.METADATA_DB)
+from backend.services.user_service import UserService
 
-def get_rdb():
-    return RealtimeDB(app_config.REALTIME_DB)
+def get_user_service() -> UserService:
+    # Cần cắm MetadataDB vào. Tốt nhất là khởi tạo MetadataDB từ config.
+    from backend.db_manager import MetadataDB
+    return UserService(metadata_db=MetadataDB(app_config.METADATA_DB))
 
-def get_cdb():
-    return CacheDB(app_config.CACHE_DB)
-
-async def get_current_user(token: str = Depends(oauth2_scheme), db: MetadataDB = Depends(get_db)):
+async def get_current_user(token: str = Depends(oauth2_scheme), user_svc: UserService = Depends(get_user_service)):
     payload = decode_token(token)
     if not payload or payload.get("sub") is None:
         raise HTTPException(
@@ -35,7 +33,7 @@ async def get_current_user(token: str = Depends(oauth2_scheme), db: MetadataDB =
             headers={"WWW-Authenticate": "Bearer"},
         )
     user_id = int(payload.get("sub"))
-    user = db.get_user_by_id(user_id)
+    user = user_svc.get_user_by_id(user_id)
     if not user:
         raise HTTPException(status_code=401, detail="User not found")
     return user
@@ -56,8 +54,8 @@ async def get_me(current_user = Depends(get_current_user)):
     }
 
 @router.post("/token", response_model=Token)
-async def login(form_data: OAuth2PasswordRequestForm = Depends(), db: MetadataDB = Depends(get_db)):
-    user = db.get_user_name(form_data.username)
+async def login(form_data: OAuth2PasswordRequestForm = Depends(), user_svc: UserService = Depends(get_user_service)):
+    user = user_svc.get_user_by_name(form_data.username)
     if not user or not verify_password(form_data.password, user["hashed_password"]):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -70,7 +68,7 @@ async def login(form_data: OAuth2PasswordRequestForm = Depends(), db: MetadataDB
     return {"access_token": access_token, "refresh_token": refresh_token, "token_type": "bearer"}
 
 @router.post("/refresh", response_model=Token)
-async def refresh(body: RefreshRequest, db: MetadataDB = Depends(get_db)):
+async def refresh(body: RefreshRequest, user_svc: UserService = Depends(get_user_service)):
     payload = decode_token(body.refresh_token)
     if not payload or payload.get("type") != "refresh":
         raise HTTPException(status_code=401, detail="Invalid refresh token")

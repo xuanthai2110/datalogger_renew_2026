@@ -29,6 +29,12 @@ class ProjectService:
     def update_project(self, project_id: int, data: ProjectUpdate):
         return self.metadata_db.patch_project(project_id, data)
 
+    def update_project_sync(self, project_id: int, server_id: Optional[int] = None, server_request_id: Optional[int] = None, status: str = 'pending'):
+        return self.metadata_db.update_project_sync(project_id, server_id, server_request_id, status)
+
+    def upsert_project(self, data: ProjectCreate, project_id: Optional[int] = None) -> ProjectResponse:
+        return self.metadata_db.upsert_project(data, project_id)
+
     def delete_project(self, project_id):
         """Xoá project và toàn bộ dữ liệu liên quan"""
         inverters = self.metadata_db.get_inverters_by_project(project_id)
@@ -42,8 +48,17 @@ class ProjectService:
     # INVERTER
     # ==============================
 
+    def get_inverter(self) -> List[InverterResponse]:
+        return self.metadata_db.get_all_inverters()
+
     def create_inverter(self, data: InverterCreate) -> int:
         return self.metadata_db.post_inverter(data)
+
+    def upsert_inverter(self, data: InverterCreate) -> int:
+        return self.metadata_db.upsert_inverter(data)
+
+    def patch_inverter(self, inverter_id: int, updates: InverterUpdate):
+        return self.metadata_db.patch_inverter(inverter_id, updates)
 
     def get_inverter_id(self, inverter_id: int) -> Optional[InverterResponse]:
         return self.metadata_db.get_inverter_by_id(inverter_id)
@@ -52,6 +67,12 @@ class ProjectService:
         self.realtime_db.delete_inverter_data(inverter_id)
         self.metadata_db.delete_inverter(inverter_id)
         return True
+
+    def get_inverters_by_project(self, project_id: int) -> List[InverterResponse]:
+        return self.metadata_db.get_inverters_by_project(project_id)
+
+    def update_inverter_sync(self, inverter_id: int, server_id: Optional[int] = None, status: str = 'pending'):
+        return self.metadata_db.update_inverter_sync(inverter_id, server_id, status)
 
     # ==============================
     # CACHE (RAM) - Dành cho Polling & Realtime UI

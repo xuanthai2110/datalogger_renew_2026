@@ -1,0 +1,75 @@
+import logging
+from dataclasses import asdict
+from backend.models.project import ProjectCreate
+from backend.models.comm import CommConfig
+from backend.models.inverter import InverterCreate
+
+logger = logging.getLogger(__name__)
+
+class ConfigService:
+    def __init__(self, metadata_db):
+        self.metadata_db = metadata_db
+
+    def get_legacy_config(self) -> dict:
+        try:
+            projects = self.metadata_db.get_projects()
+            project = asdict(projects[0]) if projects else {}
+
+            comms = self.metadata_db.get_comm_config()
+            comm = asdict(comms[0]) if comms else {}
+
+            inverters = []
+            if projects:
+                invs = self.metadata_db.get_inverters_by_project(projects[0].id)
+                inverters = [asdict(inv) for inv in invs]
+
+            return {
+                "project": project,
+                "comm": comm,
+                "inverters": inverters
+            }
+        except Exception as e:
+            logger.error(f"ConfigService.get_legacy_config error: {e}")
+            raise
+
+    def update_legacy_config(self, data: dict):
+        try:
+            with self.metadata_db._connect() as conn:
+                conn.execute("DELETE FROM inverters")
+                conn.execute("DELETE FROM projects")
+                conn.execute("DELETE FROM comm_config")
+                
+            proj_data = data.get("project", {})
+            proj_id = None
+            if proj_data:
+                if "ac_capacity_kw" not in proj_data:
+                    proj_data["ac_capacity_kw"] = proj_data.get("capacity_kw", 0.0)
+                proj = ProjectCreate(**proj_data)
+                proj_id = self.metadata_db.post_project(proj)
+
+            comm_data = data.get("comm", {})
+            comm_id = None
+            if comm_data:
+                with self.metadata_db._connect() as conn:
+                    cursor = conn.execute(
+                        "INSERT INTO comm_config (driver, comm_type, host, port, com_port, baudrate, databits, parity, stopbits, timeout, slave_id_start, slave_id_end) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                        (comm_data.get("driver"), comm_data.get("comm_type", "TCP"), comm_data.get("host"), comm_data.get("port"), comm_data.get("com_port"), comm_data.get("baudrate"), comm_data.get("databits"), comm_data.get("parity"), comm_data.get("stopbits"), comm_data.get("timeout"), comm_data.get("slave_id_start", 1), comm_data.get("slave_id_end", 30))
+                    )
+                    comm_id = cursor.lastrowid
+
+            invs_data = data.get("inverters", [])
+            for i, inv in enumerate(invs_data):
+                inv["project_id"] = proj_id
+                inv["comm_id"] = comm_id
+                inv["inverter_index"] = i + 1
+                if "rate_ac_kw" not in inv:
+                    inv["rate_ac_kw"] = inv.get("capacity_kw", 0.0)
+                if "rate_dc_kwp" not in inv:
+                    inv["rate_dc_kwp"] = inv.get("capacity_kw", 0.0)
+                
+                self.metadata_db.upsert_inverter(InverterCreate(**inv))
+
+            return True
+        except Exception as e:
+            logger.error(f"ConfigService.update_legacy_config error: {e}")
+            raise

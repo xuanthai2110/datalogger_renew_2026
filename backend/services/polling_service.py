@@ -3,7 +3,8 @@ import logging
 from datetime import datetime, timezone
 from typing import Dict, Any, List, Optional
 
-from backend.db_manager import MetadataDB, CacheDB
+from backend.db_manager import CacheDB
+from backend.services.project_service import ProjectService
 from backend.drivers.huawei_sun2000110KTL import HuaweiSUN2000
 from backend.drivers.sungrow_sg110cx import SungrowSG110CXDriver
 from backend.communication.modbus_tcp import ModbusTCP
@@ -14,8 +15,8 @@ from backend.core import config
 logger = logging.getLogger(__name__)
 
 class PollingService:
-    def __init__(self, metadata_db: MetadataDB, cache_db: CacheDB):
-        self.metadata_db = metadata_db
+    def __init__(self, project_svc: ProjectService, cache_db: CacheDB):
+        self.project_svc = project_svc
         self.cache_db = cache_db
         self.normalization = NormalizationService()
         self.transports = {}
@@ -44,12 +45,12 @@ class PollingService:
         """Lấy cấu hình polling (Projects & Inverters) từ RAM Cache hoặc Database"""
         now = time.time()
         if not self._config_cache or (now - self._last_refresh > config.CONFIG_REFRESH_INTERVAL):
-            logger.info("Refreshing Polling Configuration Cache from MetadataDB...")
-            projects = self.metadata_db.get_projects()
+            logger.info("Refreshing Polling Configuration Cache from DB through Service...")
+            projects = self.project_svc.get_projects()
             new_cache = []
             
             for project in projects:
-                inverters = self.metadata_db.get_inverters_by_project(project.id)
+                inverters = self.project_svc.get_inverters_by_project(project.id)
                 active_inverters = [inv for inv in inverters if inv.is_active]
                 new_cache.append({
                     "project": project,

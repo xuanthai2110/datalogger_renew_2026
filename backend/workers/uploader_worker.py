@@ -1,17 +1,18 @@
 import time
 import logging
 import threading
-from backend.db_manager import CacheDB, MetadataDB, RealtimeDB
+from backend.db_manager import CacheDB, RealtimeDB
+from backend.services.project_service import ProjectService
 from backend.services.uploader_service import UploaderService
 from backend.services.telemetry_service import TelemetryService
 
 logger = logging.getLogger(__name__)
 
 class UploaderWorker(threading.Thread):
-    def __init__(self, cache_db: CacheDB, metadata_db: MetadataDB, realtime_db: RealtimeDB, upload_interval: float = 300.0):
+    def __init__(self, cache_db: CacheDB, project_svc: ProjectService, realtime_db: RealtimeDB, upload_interval: float = 300.0):
         super().__init__()
         self.cache_db = cache_db
-        self.metadata_db = metadata_db
+        self.project_svc = project_svc
         self.realtime_db = realtime_db
         self.uploader = UploaderService(realtime_db)
         self.telemetry = TelemetryService(realtime_db)
@@ -35,11 +36,11 @@ class UploaderWorker(threading.Thread):
                 self.uploader.upload()
 
                 # 2. Xây gói dữ liệu mới của chu kỳ này
-                projects = self.metadata_db.get_projects()
+                projects = self.project_svc.get_projects()
                 new_payloads = 0
                 for proj in projects:
                     if not proj.server_id: continue
-                    invs = self.metadata_db.get_inverters_by_project(proj.id)
+                    invs = self.project_svc.get_inverters_by_project(proj.id)
                     payload_list = self.telemetry.build_payload_from_cache(proj.id, proj.server_id, invs, self.cache_db)
                     
                     if payload_list:

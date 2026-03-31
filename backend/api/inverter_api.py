@@ -2,10 +2,9 @@
 web/routes/inverter_route.py — CRUD routes cho Inverters
 """
 
-from fastapi import APIRouter, Body
+from fastapi import APIRouter, Body, Depends
 from fastapi.responses import JSONResponse
-from backend.db_manager import MetadataDB
-from backend.models.inverter import InverterCreate, InverterUpdate
+from backend.services.project_service import ProjectService
 from dataclasses import asdict, fields
 import logging
 from backend.core import config as app_config
@@ -13,17 +12,16 @@ from backend.core import config as app_config
 router = APIRouter(tags=["inverters"])
 logger = logging.getLogger(__name__)
 
-
-def get_db() -> MetadataDB:
-    return MetadataDB(app_config.METADATA_DB)
+def get_project_service() -> ProjectService:
+    from backend.db_manager import MetadataDB, RealtimeDB
+    return ProjectService(MetadataDB(app_config.METADATA_DB), RealtimeDB(app_config.REALTIME_DB))
 
 
 @router.get("")
-def list_inverters():
+def list_inverters(svc: ProjectService = Depends(get_project_service)):
     """Trả về tất cả thông tin của tất cả inverter."""
     try:
-        db = get_db()
-        inverters = db.get_inverter()
+        inverters = svc.get_inverter()
         return [asdict(i) for i in inverters]
     except Exception as e:
         logger.error(f"list_inverters error: {e}")
@@ -31,11 +29,10 @@ def list_inverters():
 
 
 @router.get("/{inverter_id}")
-def get_inverter_id(inverter_id: int):
+def get_inverter_id(inverter_id: int, svc: ProjectService = Depends(get_project_service)):
     """Trả về thông tin của inverter có id tương ứng."""
     try:
-        db = get_db()
-        inv = db.get_inverter_id(inverter_id)
+        inv = svc.get_inverter_id(inverter_id)
         if not inv:
             return JSONResponse(status_code=404, content={"detail": [{"loc": ["path", "inverter_id"], "msg": "Inverter not found", "type": "not_found"}]})
         return asdict(inv)
@@ -45,7 +42,9 @@ def get_inverter_id(inverter_id: int):
 
 
 @router.post("")
-def create_inverter(body: dict = Body(..., example={
+def create_inverter(
+    svc: ProjectService = Depends(get_project_service),
+    body: dict = Body(..., example={
     "project_id": 1,
     "brand": "Huawei",
     "model": "SUN2000-110KTL",
@@ -59,15 +58,14 @@ def create_inverter(body: dict = Body(..., example={
     "is_active": True,
     "slave_id": 1
 })):
-    """Tạo inverter mới trong local DB."""
+    """Tạo inverter mới trong local DB qua Service."""
     try:
-        db = get_db()
         # Lọc các trường hợp lệ cho InverterCreate
         valid_fields = {f.name for f in fields(InverterCreate)}
         filtered_body = {k: v for k, v in body.items() if k in valid_fields and k != "id"}
         
-        inv_id = db.upsert_inverter(InverterCreate(**filtered_body))
-        inv = db.get_inverter_id(inv_id)
+        inv_id = svc.upsert_inverter(InverterCreate(**filtered_body))
+        inv = svc.get_inverter_id(inv_id)
         return asdict(inv)
     except Exception as e:
         logger.error(f"create_inverter error: {e}")
@@ -75,19 +73,21 @@ def create_inverter(body: dict = Body(..., example={
 
 
 @router.patch("/{inverter_id}")
-def update_inverter(inverter_id: int, body: dict = Body(..., example={
+def update_inverter(
+    inverter_id: int,
+    svc: ProjectService = Depends(get_project_service),
+    body: dict = Body(..., example={
     "capacity_kw": 115.0,
     "is_active": False
 })):
-    """Cập nhật thông tin của inverter có id tương ứng."""
+    """Cập nhật thông tin của inverter có id tương ứng qua Service."""
     try:
-        db = get_db()
         # Lọc các trường hợp lệ cho InverterUpdate
         valid_fields = {f.name for f in fields(InverterUpdate)}
         filtered_body = {k: v for k, v in body.items() if k in valid_fields and k != "id"}
         
-        db.patch_inverter(inverter_id, InverterUpdate(**filtered_body))
-        inv = db.get_inverter_id(inverter_id)
+        svc.patch_inverter(inverter_id, InverterUpdate(**filtered_body))
+        inv = svc.get_inverter_id(inverter_id)
         if not inv:
             return JSONResponse(status_code=404, content={"ok": False, "error": "Inverter not found"})
         return asdict(inv)
@@ -97,11 +97,10 @@ def update_inverter(inverter_id: int, body: dict = Body(..., example={
 
 
 @router.delete("/{inverter_id}")
-def delete_inverter(inverter_id: int):
-    """Xoá inverter có id tương ứng."""
+def delete_inverter(inverter_id: int, svc: ProjectService = Depends(get_project_service)):
+    """Xoá inverter có id tương ứng qua Service."""
     try:
-        db = get_db()
-        db.delete_inverter(inverter_id)
+        svc.delete_inverter(inverter_id)
         return {"message": "Inverter deleted successfully"}
     except Exception as e:
         logger.error(f"delete_inverter error: {e}")

@@ -23,6 +23,7 @@ from backend.workers.logic_worker import LogicWorker
 from backend.workers.persistence_worker import PersistenceWorker
 from backend.workers.uploader_worker import UploaderWorker
 from backend.services.fault_service import FaultService
+from backend.services.project_service import ProjectService
 from backend.core import config
 
 logging.basicConfig(
@@ -37,18 +38,19 @@ def main():
         logger.info("Starting Modular 6-Threads Datalogger...")
         
         # 1. DB Layer
-        metadata_db = MetadataDB(config.METADATA_DB)
+        meta_db = MetadataDB(config.METADATA_DB)
         cache_db = CacheDB(config.CACHE_DB)
         realtime_db = RealtimeDB(config.REALTIME_DB)
         
         # 2. Service Layer
-        fault_service = FaultService(realtime_db, metadata_db)
+        project_svc = ProjectService(metadata_db=meta_db, realtime_db=realtime_db)
+        fault_service = FaultService(realtime_db, meta_db)
         
         # 3. Worker Layer
-        poll_worker = PollingWorker(metadata_db, cache_db, config.POLL_INTERVAL)
-        logic_worker = LogicWorker(cache_db, metadata_db, realtime_db, fault_service)
+        poll_worker = PollingWorker(project_svc, cache_db, config.POLL_INTERVAL)
+        logic_worker = LogicWorker(cache_db, project_svc, realtime_db, fault_service)
         persist_worker = PersistenceWorker(cache_db, realtime_db, logic_worker.energy_service, config.SNAPSHOT_INTERVAL)
-        upload_worker = UploaderWorker(cache_db, metadata_db, realtime_db, config.SNAPSHOT_INTERVAL)
+        upload_worker = UploaderWorker(cache_db, project_svc, realtime_db, config.SNAPSHOT_INTERVAL)
         
         # Start Threads
         poll_worker.start()

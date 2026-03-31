@@ -19,8 +19,9 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
-from backend.db_manager import MetadataDB
+from backend.db_manager import MetadataDB, RealtimeDB
 from backend.services.setup_service import SetupService
+from backend.services.project_service import ProjectService
 from backend.models.project import ProjectCreate, ProjectUpdate
 from backend.drivers.huawei_sun2000110KTL import HuaweiSUN2000
 from backend.communication.modbus_tcp import ModbusTCP
@@ -34,8 +35,11 @@ def main():
     # 1. Khởi tạo DB & Services
     # Sử dụng database path từ config (thường là database/metadata.db hoặc datalogger.db)
     meta_db = MetadataDB(config.METADATA_DB)
+    realtime_db = RealtimeDB(config.REALTIME_DB)
+    project_svc = ProjectService(metadata_db=meta_db, realtime_db=realtime_db)
+
     # Chúng ta không cần AuthService vì không đồng bộ server
-    setup_svc = SetupService(auth_service=None, metadata_db=meta_db)
+    setup_svc = SetupService(auth_service=None, project_service=project_svc)
     
     print("\n=== [STEP 1] LOCAL PROJECT SETUP ===")
     project_existing = setup_svc.get_local_project()
@@ -58,7 +62,7 @@ def main():
         project_data.update(config.PROJECT_INFO)
         
         new_project = ProjectCreate(**project_data)
-        project_id = meta_db.post_project(new_project)
+        project_id = project_svc.upsert_project(new_project)
         print(f"✅ Đã lưu project local (ID: {project_id})")
     else:
         project_id = project_existing.id
@@ -77,7 +81,7 @@ def main():
         
         # Cập nhật lại số lượng inverter thực tế tìm thấy (ProjectUpdate không có trường id)
         update_data = ProjectUpdate(inverter_count=len(found_ids))
-        meta_db.patch_project(project_id, update_data)
+        project_svc.update_project(project_id, update_data)
         
         print(f"✅ Quét xong. Tìm thấy và lưu {len(found_ids)} inverters vào DB local.")
         if found_ids:

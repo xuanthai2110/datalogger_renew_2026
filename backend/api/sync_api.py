@@ -1,7 +1,11 @@
 from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
-from backend.db_manager import MetadataDB
-from backend.api.auth_api import get_current_user, get_db
+from backend.services.project_service import ProjectService
+from backend.api.auth_api import get_current_user
 from backend.core import config as app_config
+
+def get_project_service() -> ProjectService:
+    from backend.db_manager import MetadataDB, RealtimeDB
+    return ProjectService(MetadataDB(app_config.METADATA_DB), RealtimeDB(app_config.REALTIME_DB))
 import requests
 import logging
 from dataclasses import asdict
@@ -12,14 +16,14 @@ logger = logging.getLogger(__name__)
 SERVER_URL = app_config.API_BASE_URL
 
 @router.post("/project/{project_id}")
-async def sync_project(project_id: int, current_user = Depends(get_current_user), db: MetadataDB = Depends(get_db)):
+async def sync_project(project_id: int, current_user = Depends(get_current_user), svc: ProjectService = Depends(get_project_service)):
     # 1. Get project data
-    project = db.get_project(project_id)
+    project = svc.get_project(project_id)
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
     
     # 2. Get inverters for this project
-    inverters = db.get_inverters_by_project(project_id)
+    inverters = svc.get_inverters_by_project(project_id)
     
     # 3. Prepare payload
     # Note: The server expects a specific format. Based on instructions:
@@ -57,10 +61,10 @@ async def sync_project(project_id: int, current_user = Depends(get_current_user)
                 res_data = response.json()
                 server_id = res_data.get("server_id") or res_data.get("id")
                 if server_id:
-                    db.update_project_sync(project_id, server_id=server_id, status='approved')
+                    svc.update_project_sync(project_id, server_id=server_id, status='approved')
                     # Also update inverters if server returned their IDs, or just mark as approved
                     for inv in inverters:
-                        db.update_inverter_sync(inv.id, status='approved')
+                        svc.update_inverter_sync(inv.id, status='approved')
                     return {"ok": True, "server_id": server_id, "message": "Project synced and approved by Admin"}
             
             logger.error(f"Sync failed (Admin): {response.status_code} - {response.text}")
@@ -74,9 +78,9 @@ async def sync_project(project_id: int, current_user = Depends(get_current_user)
                 res_data = response.json()
                 request_id = res_data.get("server_request_id") or res_data.get("id")
                 if request_id:
-                    db.update_project_sync(project_id, server_request_id=request_id, status='pending')
+                    svc.update_project_sync(project_id, server_request_id=request_id, status='pending')
                     for inv in inverters:
-                        db.update_inverter_sync(inv.id, status='pending')
+                        svc.update_inverter_sync(inv.id, status='pending')
                     return {"ok": True, "server_request_id": request_id, "message": "Project sync request sent, pending approval"}
 
             logger.error(f"Sync failed (User): {response.status_code} - {response.text}")

@@ -4,13 +4,17 @@ Refactored to support background scanning and cancellation.
 """
 from fastapi import APIRouter, Body, BackgroundTasks
 from fastapi.responses import JSONResponse
-from backend.config_manager import load_config
-from backend.db_manager import MetadataDB
+from dataclasses import asdict
 from backend.models.inverter import InverterCreate
 import logging
 import time
 import threading
 from backend.core import config as app_config
+
+def get_project_service():
+    from backend.db_manager import MetadataDB, RealtimeDB
+    from backend.services.project_service import ProjectService
+    return ProjectService(MetadataDB(app_config.METADATA_DB), RealtimeDB(app_config.REALTIME_DB))
 
 router = APIRouter(tags=["scan"])
 logger = logging.getLogger(__name__)
@@ -125,8 +129,14 @@ def start_scan(background_tasks: BackgroundTasks, body: dict = Body(default=None
         if scan_state.is_running:
             return JSONResponse(status_code=400, content={"ok": False, "error": "A scan is already in progress."})
     
-    cfg = load_config()
-    comm = cfg.get("comm", {})
+    from backend.api.comm_api import get_comm_service
+    svc = get_comm_service()
+    comms = svc.get_comm_config()
+    comm = asdict(comms[-1]) if comms else {
+        "comm_type": "TCP", "host": "127.0.0.1", "port": 502, "driver": "Huawei",
+        "slave_id_start": 1, "slave_id_end": 30
+    }
+    
     if body and "comm" in body:
         comm.update(body["comm"])
 
@@ -159,12 +169,12 @@ def stop_scan():
 @router.post("/save")
 def save_inverters(body: dict = Body(...)):
     try:
-        metadata_db = MetadataDB(app_config.METADATA_DB)
+        svc = get_project_service()
         inverters_in = body.get("inverters", [])
         saved = 0
         for inv in inverters_in:
             if not inv.get("project_id"): continue
-            metadata_db.upsert_inverter(InverterCreate(**inv))
+            svc.metadata_db.upsert_inverter(InverterCreate(**inv))
             saved += 1
         return {"ok": True, "saved": saved}
     except Exception as e:
@@ -176,10 +186,11 @@ def sync_to_server():
     try:
         from backend.services.auth_service import AuthService
         from backend.services.setup_service import SetupService
-        metadata_db = MetadataDB(app_config.METADATA_DB)
+        
+        svc = get_project_service()
         auth = AuthService()
-        setup_svc = SetupService(auth, metadata_db)
-        all_projects = metadata_db.get_projects()
+        setup_svc = SetupService(auth, svc.metadata_db)
+        all_projects = svc.get_projects()
         total_inverters = 0
         for project in all_projects:
             setup_svc.sync_project_to_server(project.id)
@@ -193,11 +204,11 @@ def sync_to_server():
 def get_setup_status():
     try:
         from dataclasses import asdict
-        metadata_db = MetadataDB(app_config.METADATA_DB)
-        all_projects = metadata_db.get_projects()
+        svc = get_project_service()
+        all_projects = svc.get_projects()
         all_inverters = []
         for p in all_projects:
-            invs = metadata_db.get_inverters_by_project(p.id)
+            invs = svc.metadata_db.get_inverters_by_project(p.id)
             for inv in invs:
                 d = asdict(inv)
                 d["project_id"] = p.id

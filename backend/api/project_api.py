@@ -3,8 +3,9 @@ web/routes/project_route.py — CRUD routes cho Projects
 """
 from fastapi import APIRouter, Depends, Body
 from fastapi.responses import JSONResponse
-from backend.db_manager import MetadataDB
+from backend.db_manager import MetadataDB, RealtimeDB
 from backend.models.project import ProjectCreate, ProjectResponse
+from backend.services.project_service import ProjectService
 from backend.api.auth_api import get_current_user_id
 from dataclasses import asdict, fields
 import logging
@@ -14,15 +15,18 @@ router = APIRouter(tags=["projects"])
 logger = logging.getLogger(__name__)
 
 
-def get_db() -> MetadataDB:
-    return MetadataDB(app_config.METADATA_DB)
+def get_project_service() -> ProjectService:
+    return ProjectService(
+        metadata_db=MetadataDB(app_config.METADATA_DB),
+        realtime_db=RealtimeDB(app_config.REALTIME_DB)
+    )
 
 
 @router.get("")
-def list_projects(db: MetadataDB = Depends(get_db), current_user = Depends(get_current_user_id)):
+def list_projects(svc: ProjectService = Depends(get_project_service), current_user = Depends(get_current_user_id)):
     """Trả về toàn bộ danh sách project trong local DB."""
     try:
-        projects = db.get_projects()
+        projects = svc.get_projects()
         return {"projects": [asdict(p) for p in projects]}
     except Exception as e:
         logger.error(f"list_projects error: {e}")
@@ -41,14 +45,14 @@ def create_project(body: dict = Body(..., example={
     "ac_capacity_kw": 100.0,
     "inverter_count": 2
 })):
-    """Tạo project mới trong local DB."""
+    """Tạo project mới trong local DB qua Service."""
     try:
-        db = get_db()
+        svc = get_project_service()
         # Lọc các trường hợp lệ cho ProjectCreate
         valid_fields = {f.name for f in fields(ProjectCreate)}
         filtered_body = {k: v for k, v in body.items() if k in valid_fields and k != "id"}
         
-        proj = db.upsert_project(ProjectCreate(**filtered_body))
+        proj = svc.upsert_project(ProjectCreate(**filtered_body))
         return asdict(proj)
     except Exception as e:
         logger.error(f"create_project error: {e}")
@@ -56,18 +60,18 @@ def create_project(body: dict = Body(..., example={
 
 
 @router.patch("/{project_id}", response_model=ProjectResponse)
-def update_project(project_id: int, db: MetadataDB = Depends(get_db), current_user = Depends(get_current_user_id), body: dict = Body(..., example={
+def update_project(project_id: int, svc: ProjectService = Depends(get_project_service), current_user = Depends(get_current_user_id), body: dict = Body(..., example={
     "name": "Dự án Năng lượng Mặt trời A (Đã sửa)",
     "capacity_kwp": 150.0,
     "elec_price_per_kwh": 1800.0
 })):
-    """Cập nhật thông tin dự án (PATCH - hỗ trợ cập nhật từng trường)."""
+    """Cập nhật thông tin dự án (PATCH - hỗ trợ cập nhật từng trường) qua Service."""
     try:
         # Lọc các trường hợp lệ cho ProjectCreate
         valid_fields = {f.name for f in fields(ProjectCreate)}
         filtered_body = {k: v for k, v in body.items() if k in valid_fields and k != "id"}
         
-        proj = db.upsert_project(ProjectCreate(**filtered_body), project_id=project_id)
+        proj = svc.upsert_project(ProjectCreate(**filtered_body), project_id=project_id)
         return asdict(proj)
     except Exception as e:
         logger.error(f"update_project error: {e}")
@@ -75,11 +79,10 @@ def update_project(project_id: int, db: MetadataDB = Depends(get_db), current_us
 
 
 @router.delete("/{project_id}")
-def delete_project(project_id: int):
-    """Xoá project và toàn bộ inverters thuộc về nó."""
+def delete_project(project_id: int, svc: ProjectService = Depends(get_project_service)):
+    """Xoá project và toàn bộ inverters thuộc về nó qua Service."""
     try:
-        db = get_db()
-        db.delete_project(project_id)
+        svc.delete_project(project_id)
         return {"ok": True}
     except Exception as e:
         logger.error(f"delete_project error: {e}")

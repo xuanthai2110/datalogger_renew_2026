@@ -1,35 +1,38 @@
 from fastapi import APIRouter, Depends, HTTPException, Body
-from backend.config_manager import load_config, save_config
+from backend.db_manager import MetadataDB
 from backend.api.auth_api import get_current_user_id
+from backend.core import config as app_config
+from backend.models.project import ProjectCreate
+from backend.models.comm import CommConfig
+from backend.models.inverter import InverterCreate
+from backend.services.config_service import ConfigService
 import logging
 
 router = APIRouter(tags=["config"])
 logger = logging.getLogger(__name__)
 
+def get_config_service() -> ConfigService:
+    from backend.db_manager import MetadataDB
+    return ConfigService(metadata_db=MetadataDB(app_config.METADATA_DB))
+
 @router.get("/current")
-def get_config(current_user: str = Depends(get_current_user_id)):
-    """Trả về cấu hình hiện tại (config.py + DB merged)."""
+def get_config(svc: ConfigService = Depends(get_config_service)):
+    """Trả về cấu hình hiện tại (ánh xạ từ MetadataDB cho Frontend cũ)."""
     try:
-        return load_config()
+        return svc.get_legacy_config()
     except Exception as e:
         logger.error(f"get_config error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.post("/update")
-def update_config(data: dict = Body(..., example={
-    "project": {
-        "name": "Updated Project Name",
-        "capacity_kwp": 150.0
-    },
-    "comm": {
-        "host": "192.168.1.100",
-        "port": 502
-    }
-}), current_user: str = Depends(get_current_user_id)):
-    """Lưu cấu hình mới vào database."""
+def update_config(data: dict = Body(...), svc: ConfigService = Depends(get_config_service)):
+    """Lưu cấu hình nhận từ Frontend cũ và nhồi vào MetadataDB chuẩn."""
     try:
-        save_config(data)
-        return {"ok": True, "message": "Config saved successfully."}
+        svc.update_legacy_config(data)
+        return {"ok": True, "message": "Config saved successfully to DB."}
     except Exception as e:
         logger.error(f"update_config error: {e}")
+        import sys
+        import traceback
+        traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))

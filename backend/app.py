@@ -4,6 +4,11 @@ backend/app.py — FastAPI Backend with WebSocket support
 import sys
 import logging
 from pathlib import Path
+
+# Setup logging immediately
+logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
+logger = logging.getLogger(__name__)
+
 from fastapi import FastAPI, Depends, WebSocket, WebSocketDisconnect
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
@@ -24,13 +29,8 @@ from backend.api.monitoring_api import router as monitoring_router
 from backend.api.comm_api import router as comm_router
 from backend.api.sync_api import router as sync_router
 
-from backend.db_manager import MetadataDB
-from backend.models.user import UserCreate
-from backend.services.local_auth_utils import hash_password
 from backend.core import config as app_config
 
-logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
-logger = logging.getLogger(__name__)
 
 app = FastAPI(title="Solar Datalogger Backend", version="2.0.0")
 
@@ -74,13 +74,13 @@ async def websocket_endpoint(websocket: WebSocket):
 
 @app.on_event("startup")
 def startup_event():
-    """Initialize system."""
+    from backend.db_manager import MetadataDB
+    from backend.services.user_service import UserService
+    from backend.core import config as app_config
+    
     db = MetadataDB(app_config.METADATA_DB)
-    if not db.get_user_by_username("admin"):
-        logger.info("Initializing default admin user...")
-        # Note: In real app, avoid hardcoded password in code
-        pass
-
+    user_svc = UserService(db)
+    user_svc.create_admin_if_not_exists()
 # Static files for SPA
 STATIC_DIR = Path(__file__).resolve().parent / "static"
 if not STATIC_DIR.exists():
