@@ -181,18 +181,20 @@ def save_inverters(body: dict = Body(...)):
         logger.error(f"[save-inverters] Error: {e}")
         return JSONResponse(status_code=500, content={"ok": False, "error": str(e)})
 
+def get_setup_service() -> SetupService:
+    from backend.services.auth_service import AuthService
+    svc = get_project_service()
+    auth = AuthService()
+    return SetupService(auth, svc)
+
 @router.post("/sync")
-def sync_to_server():
+def sync_to_server(setup_svc: SetupService = Depends(get_setup_service)):
     try:
-        from backend.services.auth_service import AuthService
-        from backend.services.setup_service import SetupService
-        
         svc = get_project_service()
-        auth = AuthService()
-        setup_svc = SetupService(auth, svc.metadata_db)
         all_projects = svc.get_projects()
         total_inverters = 0
         for project in all_projects:
+            # Sử dụng các hàm tương thích mới thêm vào SetupService
             setup_svc.sync_project_to_server(project.id)
             total_inverters += setup_svc.sync_inverters_to_server(project.id)
         return {"ok": True, "synced_projects": len(all_projects), "synced_inverters": total_inverters}

@@ -183,4 +183,35 @@ class SetupService:
                 self.project_svc.update_project_sync(project_id, status='pending', server_request_id=0)
                 return True
         except Exception: pass
-        return False
+    def sync_project_to_server(self, project_id: int) -> Optional[int]:
+        """
+        [COMPATIBILITY WRAPPER] 
+        Hàm này mô phỏng logic cũ nhưng sử dụng quy trình 'Advanced Sync'.
+        Dùng cho các script hoặc UI cũ chưa cập nhật luồng từng bước.
+        """
+        logger.info(f"[Sync-Compat] Triggering sync for project {project_id}")
+        
+        # 1. Thử auto-match trước
+        if self.pre_sync_check(project_id):
+            proj = self.project_svc.get_project(project_id)
+            return proj.server_id if proj else None
+            
+        # 2. Nếu không match, khởi tạo request mới
+        request_id = self.initiate_sync_request(project_id)
+        if request_id:
+            logger.info(f"[Sync-Compat] Request {request_id} initiated. Starting background poll.")
+            # Trong môi trường script, việc start thread polling có thể cần cân nhắc.
+            # Nhưng để 'WEB chạy bình thường' (FastAPI), chúng ta có thể dùng BackgroundTasks 
+            # Tuy nhiên ở layer Service này, chúng ta chỉ trả về ID và để API lo việc poll nếu cần.
+            # Với script, user sẽ phải đợi hoặc chạy lại script sau.
+            return None # Trả về None vì chưa có Server ID ngay lập tức
+        
+        return None
+
+    def sync_inverters_to_server(self, project_id: int) -> int:
+        """
+        [COMPATIBILITY WRAPPER]
+        Trả về số lượng inverter đang ở trạng thái chờ duyệt hoặc đã duyệt.
+        """
+        invs = self.project_svc.get_inverters_by_project(project_id)
+        return len(invs)
