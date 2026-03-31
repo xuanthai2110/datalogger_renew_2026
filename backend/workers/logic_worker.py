@@ -14,7 +14,7 @@ from backend.core import config
 logger = logging.getLogger(__name__)
 
 class LogicWorker(threading.Thread):
-    def __init__(self, cache_db, project_svc: ProjectService, realtime_db, fault_service):
+    def __init__(self, cache_db, project_svc: ProjectService, realtime_db, fault_service, build_tele_worker=None):
         super().__init__()
         self.cache_db = cache_db
         self.project_svc = project_svc
@@ -22,8 +22,7 @@ class LogicWorker(threading.Thread):
         self.fault_logic = fault_service
         self.energy_service = EnergyService(realtime_db)
         self.max_service = MaxTrackingService(realtime_db)
-        self.telemetry = TelemetryService(realtime_db)
-        self.uploader = UploaderService(realtime_db)
+        self.build_tele_worker = build_tele_worker
         self.daemon = True
         self._stop_event = threading.Event()
 
@@ -56,8 +55,6 @@ class LogicWorker(threading.Thread):
             self._trigger_immediate(pid)
 
     def _trigger_immediate(self, project_id: int):
-        proj_meta = self.project_svc.get_project(project_id)
-        if proj_meta and proj_meta.server_id:
-            invs = self.project_svc.get_inverters_by_project(project_id)
-            data = self.telemetry.build_payload_from_cache(project_id, proj_meta.server_id, invs, self.cache_db)
-            if data: self.uploader.send_immediate(data[0])
+        if self.build_tele_worker:
+            logger.info(f"LogicWorker: Triggering immediate telemetry build for project {project_id}")
+            self.build_tele_worker.trigger_now(project_id)

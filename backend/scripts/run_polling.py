@@ -21,7 +21,7 @@ from backend.db_manager import MetadataDB, CacheDB, RealtimeDB
 from backend.workers.polling_worker import PollingWorker
 from backend.workers.logic_worker import LogicWorker
 from backend.workers.persistence_worker import PersistenceWorker
-from backend.workers.uploader_worker import UploaderWorker
+from backend.workers.build_tele_worker import BuildTeleWorker
 from backend.services.fault_service import FaultService
 from backend.services.project_service import ProjectService
 from backend.core import config
@@ -35,7 +35,7 @@ logger = logging.getLogger("Launcher")
 def main():
     try:
         logger.info(f"System Path prioritized: {sys.path[0]}")
-        logger.info("Starting Modular 6-Threads Datalogger...")
+        logger.info("Starting Modular Telemetry Datalogger...")
         
         # 1. DB Layer
         meta_db = MetadataDB(config.METADATA_DB)
@@ -47,18 +47,19 @@ def main():
         fault_service = FaultService(realtime_db, meta_db)
         
         # 3. Worker Layer
+        # Chú ý: Cần BuildTeleWorker trước để truyền vào LogicWorker
+        build_tele_worker = BuildTeleWorker(cache_db, project_svc, realtime_db, config.SNAPSHOT_INTERVAL)
         poll_worker = PollingWorker(project_svc, cache_db, config.POLL_INTERVAL)
-        logic_worker = LogicWorker(cache_db, project_svc, realtime_db, fault_service)
+        logic_worker = LogicWorker(cache_db, project_svc, realtime_db, fault_service, build_tele_worker)
         persist_worker = PersistenceWorker(cache_db, realtime_db, logic_worker.energy_service, config.SNAPSHOT_INTERVAL)
-        upload_worker = UploaderWorker(cache_db, project_svc, realtime_db, config.SNAPSHOT_INTERVAL)
         
         # Start Threads
         poll_worker.start()
         logic_worker.start()
         persist_worker.start()
-        upload_worker.start()
+        build_tele_worker.start()
         
-        logger.info("System operational. Press Ctrl+C to exit.")
+        logger.info("System operational (Polling/Logic/BuildTele). Press Ctrl+C to exit.")
         while True:
             time.sleep(10)
 
