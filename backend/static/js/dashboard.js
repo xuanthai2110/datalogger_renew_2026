@@ -42,7 +42,7 @@ async function loadInverterDetail(id, sn) {
     document.getElementById('bp-p-back').innerText = currentProject.name;
     document.getElementById('bp-p-back').onclick = () => loadProjectDetail(currentProject.id);
     document.getElementById('bp-inv-sn').innerText = sn;
-    document.getElementById('detail-inv-sn').innerText = `Biến tần: ${sn}`;
+    document.getElementById('detail-inv-sn').innerHTML = `Biến tần: ${sn} <span style="font-size: 14px; font-weight: 300; opacity: 0.7; margin-left: 10px;">(Cập nhật: ${d.ac && d.ac.created_at ? new Date(d.ac.created_at).toLocaleString('vi-VN') : '--'})</span>`;
     document.getElementById('back-to-project-btn').onclick = () => loadProjectDetail(currentProject.id);
 
     const ac = d.ac;
@@ -56,7 +56,8 @@ async function loadInverterDetail(id, sn) {
 
     document.getElementById('inv-det-mppt').innerHTML = (d.mppts || []).map(m => `<div class="list-item"><p><b>MPPT ${m.mppt_index}</b></p><p>${m.V_mppt}V / ${m.I_mppt}A / ${m.P_mppt.toFixed(2)}kW</p></div>`).join('') || 'Trống';
     document.getElementById('inv-det-string').innerHTML = (d.strings || []).map(s => `<div class="list-item">String ${s.string_id}: ${s.I_string}A</div>`).join('') || 'Trống';
-    document.getElementById('inv-det-errors').innerHTML = (d.errors || []).length ? d.errors.map(e => `<div class="list-item text-danger">Lỗi ${e.fault_code}: ${e.fault_description}</div>`).join('') : '<p class="text-success">Hoạt động tốt</p>';
+    const actualErrors = (d.errors || []).filter(e => e.fault_code !== 0 && e.severity !== "STABLE");
+    document.getElementById('inv-det-errors').innerHTML = actualErrors.length ? actualErrors.map(e => `<div class="list-item text-danger">Lỗi ${e.fault_code}: ${e.fault_description}</div>`).join('') : '<p class="text-success">Hoạt động tốt</p>';
     
     showView('inverter-detail');
 }
