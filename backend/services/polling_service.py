@@ -100,9 +100,9 @@ class PollingService:
                     
                     if v_mppt is not None and i_mppt is not None:
                         self.cache_db.upsert_mppt(inv.id, i, project_id, {
-                            "V_mppt": v_mppt,
-                            "I_mppt": i_mppt,
-                            "P_mppt": round(v_mppt * i_mppt, 2)
+                            "v_mppt": v_mppt,
+                            "i_mppt": i_mppt,
+                            "p_mppt": round(v_mppt * i_mppt, 2)
                         })
                         
                         # String Cache (Mapping: strings 2i-1 and 2i for MPPT i)
