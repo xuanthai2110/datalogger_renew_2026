@@ -69,13 +69,18 @@ class RealtimeDB(BaseDB):
             cursor.execute("CREATE TABLE IF NOT EXISTS mppt_realtime (id INTEGER PRIMARY KEY AUTOINCREMENT, project_id INTEGER, inverter_id INTEGER, mppt_index INTEGER, string_on_mppt INTEGER, V_mppt REAL, I_mppt REAL, P_mppt REAL, Max_I REAL, Max_V REAL, Max_P REAL, created_at TEXT);")
             cursor.execute("CREATE TABLE IF NOT EXISTS string_realtime (id INTEGER PRIMARY KEY AUTOINCREMENT, project_id INTEGER, inverter_id INTEGER, mppt_id INTEGER, string_id INTEGER, I_string REAL, max_I REAL, created_at TEXT);")
 
-            # --- Migration: sửa typo denta_E_monthly -> delta_E_monthly ---
-            cols = {row[1] for row in conn.execute("PRAGMA table_info(inverter_ac_realtime)").fetchall()}
-            if "delta_E_monthly" not in cols:
-                # Thêm cột mới (SQLite < 3.25 không hỗ trợ RENAME COLUMN)
+            # --- Migration: project_realtime ---
+            cols_proj = {row[1] for row in conn.execute("PRAGMA table_info(project_realtime)").fetchall()}
+            if "delta_E_monthly" not in cols_proj:
+                conn.execute("ALTER TABLE project_realtime ADD COLUMN delta_E_monthly REAL DEFAULT 0")
+                if "denta_E_monthly" in cols_proj:
+                    conn.execute("UPDATE project_realtime SET delta_E_monthly = denta_E_monthly")
+
+            # --- Migration: inverter_ac_realtime ---
+            cols_ac = {row[1] for row in conn.execute("PRAGMA table_info(inverter_ac_realtime)").fetchall()}
+            if "delta_E_monthly" not in cols_ac:
                 conn.execute("ALTER TABLE inverter_ac_realtime ADD COLUMN delta_E_monthly REAL DEFAULT 0")
-                # Copy giá trị từ cột typo nếu tồn tại
-                if "denta_E_monthly" in cols:
+                if "denta_E_monthly" in cols_ac:
                     conn.execute("UPDATE inverter_ac_realtime SET delta_E_monthly = denta_E_monthly")
 
 
