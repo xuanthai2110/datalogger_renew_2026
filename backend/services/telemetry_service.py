@@ -82,7 +82,7 @@ class TelemetryService:
                 else:
                     errors = [{
                         "fault_code": err_row.get("fault_code", 0),
-                        "fault_description": err_row.get("fault_text") or ("STATUS: " + str(err_row.get("status_code", 0))),
+                        "fault_description": err_row.get("fault_text"),
                         "repair_instruction": "",
                         "severity": "STABLE",
                         "created_at": self._format_ts(err_row.get("updated_at"))
