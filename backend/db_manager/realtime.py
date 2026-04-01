@@ -149,11 +149,12 @@ class RealtimeDB(BaseDB):
             # Lấy bản ghi có created_at mới nhất cho inverter này
             rows = conn.execute("""
                 SELECT * FROM mppt_realtime
-                WHERE inverter_id = ?
-                AND created_at = (
-                    SELECT MAX(created_at) FROM mppt_realtime WHERE inverter_id = ?
+                WHERE id IN (
+                    SELECT MAX(id) FROM mppt_realtime 
+                    WHERE inverter_id = ?
+                    GROUP BY mppt_index
                 )
-            """, (inverter_id, inverter_id)).fetchall()
+            """, (inverter_id,)).fetchall()
             return [to_dataclass(mpptRealtimeResponse, r) for r in rows]
 
     def get_inverter_errors(self, inverter_id: int) -> List[InverterErrorResponse]:
@@ -176,11 +177,12 @@ class RealtimeDB(BaseDB):
         with self._connect() as conn:
             rows = conn.execute("""
                 SELECT * FROM string_realtime
-                WHERE inverter_id = ?
-                AND created_at = (
-                    SELECT MAX(created_at) FROM string_realtime WHERE inverter_id = ?
+                WHERE id IN (
+                    SELECT MAX(id) FROM string_realtime 
+                    WHERE inverter_id = ?
+                    GROUP BY string_id
                 )
-            """, (inverter_id, inverter_id)).fetchall()
+            """, (inverter_id,)).fetchall()
             return [to_dataclass(stringRealtimeResponse, r) for r in rows]
 
     def post_string_batch(self, records: List[stringRealtimeCreate]):
