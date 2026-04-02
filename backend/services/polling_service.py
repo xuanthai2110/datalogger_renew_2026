@@ -10,6 +10,7 @@ from backend.drivers.sungrow_sg110cx import SungrowSG110CXDriver
 from backend.communication.modbus_tcp import ModbusTCP
 from backend.communication.modbus_rtu import ModbusRTU
 from backend.services.normalization_service import NormalizationService
+from backend.services.fault_service import FaultService
 from backend.core import config
 
 logger = logging.getLogger(__name__)
@@ -19,6 +20,7 @@ class PollingService:
         self.project_svc = project_svc
         self.cache_db = cache_db
         self.normalization = NormalizationService()
+        self.fault_service = FaultService(None, None)
         self.transports = {}
         
         # Caching logic
@@ -109,10 +111,18 @@ class PollingService:
                         i_str = clean.get(f"string_{s_idx}_current", 0.0)
                         self.cache_db.upsert_string(inv.id, s_idx, project_id, i, i_str)
 
-                # Error Cache (Mã trạng thái thô)
+                # Error Cache (Mã trạng thái thô & Mapping JSON)
                 status_code = raw_data.get("state_id", 0)
                 fault_code = raw_data.get("fault_code", 0)
-                self.cache_db.upsert_error(inv.id, project_id, status_code, fault_code)
+                
+                polling_time = datetime.now().isoformat()
+                errors_payload = self.fault_service.get_inverter_status_payload(inv.brand, status_code, fault_code, polling_time)
+                
+                import json
+                fault_json = json.dumps(errors_payload, ensure_ascii=False) if errors_payload else "[]"
+                status_text = errors_payload[0].get("fault_description", "") if errors_payload else "RUNNING"
+                
+                self.cache_db.upsert_error(inv.id, project_id, status_code, fault_code, status_text=status_text, fault_json=fault_json)
                 
                 logger.info(f"Poll & Cache Success - Inverter {inv.id}")
                 
