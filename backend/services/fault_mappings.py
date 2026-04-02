@@ -97,13 +97,13 @@ SUNGROW_STATE_MAP = {
 }
 
 HUAWEI_FAULT_MAP = {
-    2000: {"id_huawei": 2000, "id_unified": 0, "name": "RUNNING", "severity": "STABLE", "repair_instruction": "Normal."},
-    2001: {"id_huawei": 2001, "id_unified": 1001, "name": "GRID_OVERVOLTAGE", "severity": "ERROR", "repair_instruction": "Check grid voltage."},
-    2002: {"id_huawei": 2002, "id_unified": 1003, "name": "GRID_UNDERVOLTAGE", "severity": "ERROR", "repair_instruction": "Check grid voltage."},
-    2003: {"id_huawei": 2003, "id_unified": 1005, "name": "GRID_OVERFREQUENCY", "severity": "ERROR", "repair_instruction": "Check frequency."},
-    2004: {"id_huawei": 2004, "id_unified": 1006, "name": "GRID_UNDERFREQUENCY", "severity": "ERROR", "repair_instruction": "Check frequency."},
-    2005: {"id_huawei": 2005, "id_unified": 1007, "name": "GRID_LOSS", "severity": "ERROR", "repair_instruction": "Check AC breaker."},
-    2006: {"id_huawei": 2006, "id_unified": 1009, "name": "GRID_PHASE_FAULT", "severity": "ERROR", "repair_instruction": "Check phase sequence."},
+    200: {"id_huawei": 200, "id_unified": 0, "name": "RUNNING", "severity": "STABLE", "repair_instruction": "Normal."},
+    201: {"id_huawei": 201, "id_unified": 1001, "name": "GRID_OVERVOLTAGE", "severity": "ERROR", "repair_instruction": "Check grid voltage."},
+    202: {"id_huawei": 202, "id_unified": 1003, "name": "GRID_UNDERVOLTAGE", "severity": "ERROR", "repair_instruction": "Check grid voltage."},
+    203: {"id_huawei": 203, "id_unified": 1005, "name": "GRID_OVERFREQUENCY", "severity": "ERROR", "repair_instruction": "Check frequency."},
+    204: {"id_huawei": 204, "id_unified": 1006, "name": "GRID_UNDERFREQUENCY", "severity": "ERROR", "repair_instruction": "Check frequency."},
+    205: {"id_huawei": 205, "id_unified": 1007, "name": "GRID_LOSS", "severity": "ERROR", "repair_instruction": "Check AC breaker."},
+    206: {"id_huawei": 206, "id_unified": 1009, "name": "GRID_PHASE_FAULT", "severity": "ERROR", "repair_instruction": "Check phase sequence."},
     2011: {"id_huawei": 2011, "id_unified": 1102, "name": "DC_OVERVOLTAGE", "severity": "ERROR", "repair_instruction": "Check PV voltage."},
     2012: {"id_huawei": 2012, "id_unified": 1202, "name": "DC_INSULATION_FAULT", "severity": "ERROR", "repair_instruction": "Check insulation."},
     2013: {"id_huawei": 2013, "id_unified": 1206, "name": "GROUND_FAULT", "severity": "ERROR", "repair_instruction": "Check grounding."},
@@ -113,121 +113,55 @@ HUAWEI_FAULT_MAP = {
     2022: {"id_huawei": 2022, "id_unified": 1401, "name": "FAN_FAULT", "severity": "WARNING", "repair_instruction": "Check fan."},
 }
 
+# 
+# Key = Decimal value of the official Huawei hex state code (e.g. 0x0200 = 512)
+# Retrieved from Modbus register 32089 (uint16)
 HUAWEI_STATE_MAP = {
+    # Standby & khởi động
+    0:    {"id_huawei": 0,    "id_unified": 12, "name": "INITIAL_STANDBY", "severity": "STABLE",  "description": "Inverter initialized and waiting"},
+    1:    {"id_huawei": 1,    "id_unified": 13, "name": "GRID_DETECTING",  "severity": "WARNING", "description": "Detecting grid parameters"},
+    2:    {"id_huawei": 2,    "id_unified": 14, "name": "INSULATION_CHECK","severity": "WARNING", "description": "Performing insulation resistance test"},
+    3:    {"id_huawei": 3,    "id_unified": 15, "name": "SELF_CHECK",      "severity": "WARNING", "description": "Self check before startup"},
+    256:  {"id_huawei": 256,  "id_unified": 3,  "name": "STARTING",        "severity": "WARNING", "description": "Inverter starting"},
 
-    0: {
-    "id_huawei": 0,
-    "id_unified": 12,
-    "name": "INITIAL_STANDBY",
-    "severity": "STABLE",
-    "description": "Inverter initialized and waiting"
-    },
+    # Vận hành
+    512:  {"id_huawei": 512,  "id_unified": 1,  "name": "RUNNING",         "severity": "STABLE",  "description": "Inverter running normally"},
+    513:  {"id_huawei": 513,  "id_unified": 7,  "name": "DERATING",        "severity": "WARNING", "description": "Running with power derating"},
+    514:  {"id_huawei": 514,  "id_unified": 20, "name": "POWER_LIMITED",   "severity": "WARNING", "description": "Grid connection power limited"},
+    515:  {"id_huawei": 515,  "id_unified": 16, "name": "OFF_GRID_RUNNING","severity": "STABLE",  "description": "Off-grid running mode"},
+    2560: {"id_huawei": 2560, "id_unified": 8,  "name": "DISPATCH_RUNNING","severity": "STABLE",  "description": "Off-grid charging / dispatch running"},
 
-    1: {
-    "id_huawei": 1,
-    "id_unified": 13,
-    "name": "GRID_DETECTING",
-    "severity": "WARNING",
-    "description": "Detecting grid parameters"
-    },
+    # Shutdown
+    768:  {"id_huawei": 768,  "id_unified": 5,  "name": "FAULT",           "severity": "ERROR",   "description": "Fault condition detected"},
+    769:  {"id_huawei": 769,  "id_unified": 19, "name": "SHUTTING_DOWN",   "severity": "WARNING", "description": "Shutdown in progress"},
+    770:  {"id_huawei": 770,  "id_unified": 9,  "name": "COMMUNICATION_FAULT","severity": "ERROR","description": "Communication disconnected"},
+    771:  {"id_huawei": 771,  "id_unified": 10, "name": "EMERGENCY_STOP",  "severity": "ERROR",   "description": "Emergency stop triggered"},
+    772:  {"id_huawei": 772,  "id_unified": 20, "name": "POWER_LIMITED",   "severity": "WARNING", "description": "Shutdown due to power limit"},
+    773:  {"id_huawei": 773,  "id_unified": 11, "name": "KEY_STOP",        "severity": "ERROR",   "description": "Manual key stop"},
+    774:  {"id_huawei": 774,  "id_unified": 4,  "name": "STOPPED",         "severity": "ERROR",   "description": "DC switches disconnected"},
+    775:  {"id_huawei": 775,  "id_unified": 19, "name": "SHUTTING_DOWN",   "severity": "WARNING", "description": "Rapid cutoff"},
+    776:  {"id_huawei": 776,  "id_unified": 5,  "name": "FAULT",           "severity": "ERROR",   "description": "Input underpower"},
 
-    2: {
-    "id_huawei": 2,
-    "id_unified": 14,
-    "name": "INSULATION_CHECK",
-    "severity": "WARNING",
-    "description": "Performing insulation resistance test"
-    },
+    # Grid scheduling
+    1025: {"id_huawei": 1025, "id_unified": 23, "name": "GRID_SCHEDULING_COSPHI_P", "severity": "STABLE", "description": "cosφ–P curve scheduling"},
+    1026: {"id_huawei": 1026, "id_unified": 24, "name": "GRID_SCHEDULING_Q_U",      "severity": "STABLE", "description": "Q–U curve scheduling"},
+    1027: {"id_huawei": 1027, "id_unified": 25, "name": "GRID_SCHEDULING_PF_U",     "severity": "STABLE", "description": "PF–U curve scheduling"},
+    1028: {"id_huawei": 1028, "id_unified": 26, "name": "GRID_SCHEDULING_DRY_CONTACT","severity":"STABLE","description": "Dry contact scheduling"},
+    1029: {"id_huawei": 1029, "id_unified": 27, "name": "GRID_SCHEDULING_Q_P",      "severity": "STABLE", "description": "Q–P curve scheduling"},
 
-    3: {
-    "id_huawei": 3,
-    "id_unified": 15,
-    "name": "SELF_CHECK",
-    "severity": "WARNING",
-    "description": "Self check before startup"
-    },
+    # Kiểm tra & chẩn đoán
+    1280: {"id_huawei": 1280, "id_unified": 28, "name": "SPOT_CHECK_READY", "severity": "STABLE",  "description": "Ready for spot check"},
+    1281: {"id_huawei": 1281, "id_unified": 29, "name": "SPOT_CHECKING",    "severity": "WARNING", "description": "Performing spot check"},
+    1536: {"id_huawei": 1536, "id_unified": 30, "name": "INSPECTING",       "severity": "WARNING", "description": "Inspection in progress"},
+    1792: {"id_huawei": 1792, "id_unified": 31, "name": "AFCI_SELF_CHECK",  "severity": "WARNING", "description": "Arc fault circuit interrupter self check"},
+    2048: {"id_huawei": 2048, "id_unified": 32, "name": "IV_SCANNING",      "severity": "WARNING", "description": "I-V curve scanning"},
+    2304: {"id_huawei": 2304, "id_unified": 33, "name": "DC_INPUT_DETECTION","severity":"WARNING", "description": "DC input detection"},
 
-    4: {
-    "id_huawei": 4,
-    "id_unified": 3,
-    "name": "STARTING",
-    "severity": "WARNING",
-    "description": "Inverter starting"
-    },
-
-    5: {
-    "id_huawei": 5,
-    "id_unified": 1,
-    "name": "RUNNING",
-    "severity": "STABLE",
-    "description": "Inverter running normally"
-    },
-
-    6: {
-    "id_huawei": 6,
-    "id_unified": 6,
-    "name": "ALARM_RUNNING",
-    "severity": "WARNING",
-    "description": "Running with alarm"
-    },
-
-    7: {
-    "id_huawei": 7,
-    "id_unified": 7,
-    "name": "DERATING",
-    "severity": "WARNING",
-    "description": "Running with power derating"
-    },
-
-    8: {
-    "id_huawei": 8,
-    "id_unified": 4,
-    "name": "STOPPED",
-    "severity": "ERROR",
-    "description": "Inverter stopped"
-    },
-
-    9: {
-    "id_huawei": 9,
-    "id_unified": 5,
-    "name": "FAULT",
-    "severity": "ERROR",
-    "description": "Fault condition detected"
-    },
-
-    10: {
-    "id_huawei": 10,
-    "id_unified": 18,
-    "name": "UPGRADING",
-    "severity": "WARNING",
-    "description": "Firmware upgrading"
-    },
-
-    11: {
-    "id_huawei": 11,
-    "id_unified": 19,
-    "name": "SHUTTING_DOWN",
-    "severity": "WARNING",
-    "description": "Shutdown in progress"
-    },
-
-    12: {
-    "id_huawei": 12,
-    "id_unified": 21,
-    "name": "GRID_FAULT_WAIT",
-    "severity": "WARNING",
-    "description": "Waiting for grid recovery"
-    },
-
-    13: {
-    "id_huawei": 13,
-    "id_unified": 17,
-    "name": "MAINTENANCE_MODE",
-    "severity": "ERROR",
-    "description": "Maintenance mode active"
-    }
-
+    # Standby khác
+    40960:{"id_huawei": 40960,"id_unified": 22, "name": "SLEEP",            "severity": "STABLE",  "description": "No irradiation, inverter sleeping"}
 }
+
+
 SUNGROW_STATE_MAP = {
 
     0: {

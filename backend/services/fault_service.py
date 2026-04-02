@@ -3,10 +3,10 @@ import json
 from datetime import datetime
 from typing import Dict, Set, List, Tuple
 from backend.db_manager import RealtimeDB, MetadataDB
-from backend.services.fault_mappings import FAULT_MAPS, STATE_MAPS, HUAWEI_MODBUS_MAP
+from backend.services.fault_mappings import FAULT_MAPS, STATE_MAPS
 from backend.models.realtime import InverterErrorCreate
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger(__name__)    
 
 class FaultService:
     """Dịch vụ hợp nhất quản lý Trạng thái và Lỗi Inverter."""
@@ -27,10 +27,9 @@ class FaultService:
 
     def get_inverter_status_payload(self, brand: str, raw_state: int, raw_fault: int, polling_time: str) -> list:
         brand = brand.upper()
-        # 1. Map State
-        mapped_state_id = raw_state
-        if brand == "HUAWEI": mapped_state_id = HUAWEI_MODBUS_MAP.get(raw_state, 5)
-        state_info = STATE_MAPS.get(brand, {}).get(mapped_state_id, {"name": "RUNNING", "severity": "STABLE"})
+        # 1. Map State — raw_state is already the hex code value (e.g. 512 = 0x0200)
+        state_info = STATE_MAPS.get(brand, {}).get(raw_state, {"name": "RUNNING", "severity": "STABLE"})
+
         
         errors = []
         if state_info["severity"] != "STABLE":
