@@ -158,7 +158,7 @@ HUAWEI_STATE_MAP = {
     2304: {"id_huawei": 2304, "id_unified": 33, "name": "DC_INPUT_DETECTION","severity":"WARNING", "description": "DC input detection"},
 
     # Standby khác
-    40960:{"id_huawei": 40960,"id_unified": 22, "name": "SLEEP",            "severity": "STABLE",  "description": "No irradiation, inverter sleeping"}
+    40960:{"id_huawei": 40960,"id_unified": 22, "name": "SLEEP",            "severity": "DISCONNECT",  "description": "No irradiation, inverter sleeping"}
 }
 
 
