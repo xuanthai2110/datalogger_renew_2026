@@ -27,7 +27,7 @@ else:
 # ===========================================================
 # API
 # ===========================================================
-API_BASE_URL = "https://api.hirubicsolar.io.vn"
+API_BASE_URL = "https://api.hivision.vn/"
 DEV_MODE     = True
 
 
