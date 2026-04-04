@@ -26,7 +26,7 @@ def test_smartlogger():
     try:
         smartlogger = SmartLoggerHuawei(transport, slave_id=0)
         print("\n=== SMARTLOGGER CONTROL ===")
-        smartlogger.control_P(300)
+        smartlogger.control_P(880)
         print("Đã điều khiển công suất")
         time.sleep(5)
 
