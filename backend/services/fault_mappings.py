@@ -119,17 +119,17 @@ HUAWEI_FAULT_MAP = {
 HUAWEI_STATE_MAP = {
     # Standby & khởi động
     0:    {"id_huawei": 0,    "id_unified": 12, "name": "INITIAL_STANDBY", "severity": "STABLE",  "description": "Inverter initialized and waiting"},
-    1:    {"id_huawei": 1,    "id_unified": 13, "name": "GRID_DETECTING",  "severity": "WARNING", "description": "Detecting grid parameters"},
-    2:    {"id_huawei": 2,    "id_unified": 14, "name": "INSULATION_CHECK","severity": "WARNING", "description": "Performing insulation resistance test"},
-    3:    {"id_huawei": 3,    "id_unified": 15, "name": "SELF_CHECK",      "severity": "WARNING", "description": "Self check before startup"},
-    256:  {"id_huawei": 256,  "id_unified": 3,  "name": "STARTING",        "severity": "WARNING", "description": "Inverter starting"},
+    1:    {"id_huawei": 1,    "id_unified": 13, "name": "GRID_DETECTING",  "severity": "STABLE", "description": "Detecting grid parameters"},
+    2:    {"id_huawei": 2,    "id_unified": 14, "name": "INSULATION_CHECK","severity": "STABLE", "description": "Performing insulation resistance test"},
+    3:    {"id_huawei": 3,    "id_unified": 15, "name": "SELF_CHECK",      "severity": "STABLE", "description": "Self check before startup"},
+    256:  {"id_huawei": 256,  "id_unified": 3,  "name": "STARTING",        "severity": "STABLE", "description": "Inverter starting"},
 
     # Vận hành
     512:  {"id_huawei": 512,  "id_unified": 1,  "name": "RUNNING",         "severity": "STABLE",  "description": "Inverter running normally"},
     513:  {"id_huawei": 513,  "id_unified": 7,  "name": "DERATING",        "severity": "WARNING", "description": "Running with power derating"},
     514:  {"id_huawei": 514,  "id_unified": 20, "name": "POWER_LIMITED",   "severity": "WARNING", "description": "Grid connection power limited"},
-    515:  {"id_huawei": 515,  "id_unified": 16, "name": "OFF_GRID_RUNNING","severity": "STABLE",  "description": "Off-grid running mode"},
-    2560: {"id_huawei": 2560, "id_unified": 8,  "name": "DISPATCH_RUNNING","severity": "STABLE",  "description": "Off-grid charging / dispatch running"},
+    515:  {"id_huawei": 515,  "id_unified": 16, "name": "OFF_GRID_RUNNING","severity": "WARNING",  "description": "Off-grid running mode"},
+    2560: {"id_huawei": 2560, "id_unified": 8,  "name": "DISPATCH_RUNNING","severity": "WARNING",  "description": "Off-grid charging / dispatch running"},
 
     # Shutdown
     768:  {"id_huawei": 768,  "id_unified": 5,  "name": "FAULT",           "severity": "ERROR",   "description": "Fault condition detected"},
