@@ -29,6 +29,10 @@ def test_smartlogger():
         print("=== SMARTLOGGER STATUS ===")
         status = smartlogger.control_status()
         print(status)
+
+        print("\n=== SMARTLOGGER ACTUAL POWER ===")
+        actual_power = smartlogger.read_actual_power()
+        print(actual_power)
     finally:
         transport.close()
 

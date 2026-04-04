@@ -136,3 +136,45 @@ class SmartLoggerHuawei(BaseDriver):
             value -= 0x100000000
 
         return value / 1000
+
+    def register_map(self) -> Dict[str, Any]: #Trả về một dict chứa thông tin về các register của inverter, bao gồm địa chỉ, kiểu dữ liệu, v.v.
+        pass
+
+    #================ hàm parse dữ liệu từ raw register sang engineering value =========================
+
+    def parse(self, raw_data: Dict[str, Any]) -> Dict[str, Any]:
+        pass
+    # =============Các hàm đọc dữ liệu từ inverter =========================
+    def read_ac(self) -> Dict[str, Any]: #Đọc toàn bộ AC data:
+        pass
+
+
+    def read_dc(self) -> Dict[str, Any]: #Đọc toàn bộ DC data:
+        pass
+
+
+    def read_info(self) -> Dict[str, Any]: #Đọc thông tin inverter như model, firmware version, serial number, v.v.
+        pass
+
+
+    def read_string(self) -> Dict[str, Any]: #Đọc dữ liệu từng string :
+        pass
+
+
+    def read_all(self) -> Dict[str, Any]: #Đọc tất cả dữ liệu (AC, DC, info, string) trong một lần gọi.
+        pass
+
+    #================ Điều khiển inverter =========================
+
+
+    def enable_power_limit(self, enable: bool) -> bool: #Bật / tắt chế độ power limit.
+        pass
+
+
+    def write_power_limit_kw(self, kw: float) -> bool: #Ghi giá trị giới hạn công suất (kW).
+        pass
+    def read_states_and_faults(self) -> Dict[str, Any]: #Đọc trạng thái và lỗi của inverter.
+        pass
+    def write_power_limit_percent(self, percent: float) -> bool: #Ghi giá trị giới hạn công suất (%).
+        pass
+        
