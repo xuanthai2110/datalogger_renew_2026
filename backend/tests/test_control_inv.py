@@ -47,18 +47,10 @@ try:
 
     print("\n=== TEST PERCENT ===")
     for i in range(5):
-        write_u16(40125, int(50 * 10))   # 50%
+        write_u16(40125, int(10 * 10))   # 50%
         time.sleep(1)
+    time.sleep(100)
 
-    print("\n=== TEST KW ===")
-    for i in range(5):
-        write_u16(40120, int(10 * 10))   # 50 kW
-        time.sleep(1)
-
-    print("\n=== TEST W ===")
-    for i in range(5):
-        write_u32(40126, 10000)          # 50,000 W
-        time.sleep(1)
     print("\n=== DISABLE CONTROL ===")
     for i in range(3):
         write_u16(40125, int(100 * 10))  # 100%
