@@ -46,15 +46,12 @@ def write_u32(addr, value):
 try:
 
     print("\n=== TEST PERCENT ===")
-    for i in range(5):
-        write_u16(40125, int(10 * 10))   # 50%
-        time.sleep(1)
-    time.sleep(100)
+    write_u16(40125, int(10 * 10))
+    time.sleep(300)
 
     print("\n=== DISABLE CONTROL ===")
-    for i in range(3):
-        write_u16(40125, int(100 * 10))  # 100%
-        time.sleep(1)
+    write_u16(40125, int(100 * 10))  # 100%
+    time.sleep(1)
 
 finally:
     client.close()
