@@ -280,17 +280,32 @@ class RealtimeDB(BaseDB):
         with self._connect() as conn:
             cursor = conn.cursor()
             if schedule_id:
-                fields = []
-                values = []
-                for k, v in data_dict.items():
-                    if v is not None:
-                        fields.append(f"{k} = ?")
-                        values.append(v)
-                if not fields:
-                    return self.get_schedule(schedule_id)
-                values.append(schedule_id)
-                cursor.execute(f"UPDATE control_schedules SET {', '.join(fields)} WHERE id=?", tuple(values))
-                final_id = schedule_id
+                existing = conn.execute(
+                    "SELECT 1 FROM control_schedules WHERE id=?",
+                    (schedule_id,),
+                ).fetchone()
+                if existing:
+                    fields = []
+                    values = []
+                    for k, v in data_dict.items():
+                        if v is not None:
+                            fields.append(f"{k} = ?")
+                            values.append(v)
+                    if not fields:
+                        return self.get_schedule(schedule_id)
+                    values.append(schedule_id)
+                    cursor.execute(f"UPDATE control_schedules SET {', '.join(fields)} WHERE id=?", tuple(values))
+                    final_id = schedule_id
+                else:
+                    insert_dict = {"id": schedule_id, **data_dict}
+                    keys = [k for k, v in insert_dict.items() if v is not None]
+                    placeholders = ["?" for _ in keys]
+                    values = [insert_dict[k] for k in keys]
+                    cursor.execute(
+                        f"INSERT INTO control_schedules ({', '.join(keys)}) VALUES ({', '.join(placeholders)})",
+                        tuple(values),
+                    )
+                    final_id = schedule_id
             else:
                 keys = [k for k, v in data_dict.items() if v is not None]
                 placeholders = ["?" for _ in keys]
