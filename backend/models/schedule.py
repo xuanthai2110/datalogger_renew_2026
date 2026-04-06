@@ -12,6 +12,7 @@ class ControlScheduleCreate:
     start_at: str
     end_at: str
     
+    id: Optional[int] = None
     inverter_index: Optional[int] = None
     limit_watts: Optional[float] = None
     limit_percent: Optional[float] = None
