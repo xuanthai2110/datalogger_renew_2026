@@ -2,7 +2,6 @@ import time
 import logging
 import threading
 from datetime import datetime
-from dateutil import parser
 from backend.services.schedule_service import ScheduleService
 from backend.services.control_service import ControlService
 
@@ -30,8 +29,13 @@ class ScheduleWorker(threading.Thread):
                 
                 for s in schedules:
                     try:
-                        start_time = parser.parse(s.start_at)
-                        end_time = parser.parse(s.end_at)
+                        def parse_iso(dt_str):
+                            if dt_str.endswith('Z'):
+                                dt_str = dt_str[:-1] + '+00:00'
+                            return datetime.fromisoformat(dt_str)
+
+                        start_time = parse_iso(s.start_at)
+                        end_time = parse_iso(s.end_at)
                         
                         # Support naiive and timezone aware matching
                         if start_time.tzinfo and not now.tzinfo:
