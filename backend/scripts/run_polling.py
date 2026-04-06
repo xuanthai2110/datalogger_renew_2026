@@ -62,7 +62,13 @@ def main():
         control_svc = ControlService(polling_service=poll_worker.service)
         schedule_worker = ScheduleWorker(schedule_svc, control_svc, interval=1.0)
         
-        mqtt_sub = MqttSubscriber(broker=config.MQTT_BROKER,port=config.MQTT_PORT,schedule_service=schedule_svc)
+        mqtt_sub = MqttSubscriber(
+            broker=config.MQTT_BROKER, 
+            port=config.MQTT_PORT,
+            schedule_service=schedule_svc,
+            username=config.MQTT_USERNAME,
+            password=config.MQTT_PASSWORD
+        )
         
         # Start Threads
         poll_worker.start()

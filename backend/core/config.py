@@ -58,8 +58,10 @@ RETRIES         = 1
 # ===========================================================
 # MQTT (Control Scheduling & Telemetry)
 # ===========================================================
-MQTT_BROKER = os.getenv("MQTT_BROKER", "14.224.236.53")
-MQTT_PORT   = int(os.getenv("MQTT_PORT", 1883))
+MQTT_BROKER   = os.getenv("MQTT_BROKER", "14.224.236.53")
+MQTT_PORT     = int(os.getenv("MQTT_PORT", 1883))
+MQTT_USERNAME = os.getenv("MQTT_USERNAME", "admin")
+MQTT_PASSWORD = os.getenv("MQTT_PASSWORD", "@Dm!n")
 
 # ===========================================================
 # PROJECT INFO

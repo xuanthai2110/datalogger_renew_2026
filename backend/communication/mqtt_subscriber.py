@@ -7,17 +7,21 @@ from backend.services.schedule_service import ScheduleService
 logger = logging.getLogger(__name__)
 
 class MqttSubscriber:
-    def __init__(self, broker: str, port: int, schedule_service: ScheduleService, project_id: int = None):
+    def __init__(self, broker: str, port: int, schedule_service: ScheduleService, project_id: int = None, username: str = None, password: str = None):
         self.broker = broker
         self.port = port
         self.schedule_service = schedule_service
         self.project_id_filter = project_id # can be None for all projects
+        self.username = username
+        self.password = password
         self.client = mqtt.Client()
         self.client.on_connect = self.on_connect
         self.client.on_message = self.on_message
 
     def connect(self):
         try:
+            if self.username:
+                self.client.username_pw_set(self.username, self.password)
             self.client.connect(self.broker, self.port, 60)
             self.client.loop_start()
             logger.info(f"[MQTT] Connected to {self.broker}:{self.port}")
