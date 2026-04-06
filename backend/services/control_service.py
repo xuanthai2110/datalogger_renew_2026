@@ -39,21 +39,22 @@ class ControlService:
                     continue
                 
                 try:
-                    if schedule.mode == "MAXP" and schedule.limit_watts is not None:
-                        if hasattr(driver, "control_P"): # Cho SmartloggerHuawei
-                            driver.control_P(schedule.limit_watts / 1000.0)
-                        elif hasattr(driver, "set_power_w"): # Cho HuaweiSUN2000
-                            driver.set_power_w(schedule.limit_watts)
-                        elif hasattr(driver, "set_power_kw"):
-                            driver.set_power_kw(schedule.limit_watts / 1000.0)
-                        logger.info(f"[ControlService] Set {schedule.limit_watts}W cho Inv ID {inv.id}")
-                        
-                    elif schedule.mode == "LIMIT_PERCENT" and schedule.limit_percent is not None:
-                        if hasattr(driver, "control_percent"): # Cho SmartloggerHuawei
-                            driver.control_percent(schedule.limit_percent)
-                        elif hasattr(driver, "set_power_percent"): # Cho HuaweiSUN2000
-                            driver.set_power_percent(schedule.limit_percent)
-                        logger.info(f"[ControlService] Set {schedule.limit_percent} percent cho Inv ID {inv.id}")
+                    with transport.arbiter.operation("control"):
+                        if schedule.mode == "MAXP" and schedule.limit_watts is not None:
+                            if hasattr(driver, "control_P"): # Cho SmartloggerHuawei
+                                driver.control_P(schedule.limit_watts / 1000.0)
+                            elif hasattr(driver, "set_power_w"): # Cho HuaweiSUN2000
+                                driver.set_power_w(schedule.limit_watts)
+                            elif hasattr(driver, "set_power_kw"):
+                                driver.set_power_kw(schedule.limit_watts / 1000.0)
+                            logger.info(f"[ControlService] Set {schedule.limit_watts}W cho Inv ID {inv.id}")
+                            
+                        elif schedule.mode == "LIMIT_PERCENT" and schedule.limit_percent is not None:
+                            if hasattr(driver, "control_percent"): # Cho SmartloggerHuawei
+                                driver.control_percent(schedule.limit_percent)
+                            elif hasattr(driver, "set_power_percent"): # Cho HuaweiSUN2000
+                                driver.set_power_percent(schedule.limit_percent)
+                            logger.info(f"[ControlService] Set {schedule.limit_percent} percent cho Inv ID {inv.id}")
                 except Exception as e:
                     logger.error(f"[ControlService] Modbus write fail on Inv {inv.id}: {e}")
                     success = False
@@ -85,10 +86,11 @@ class ControlService:
                     continue
                 
                 try:
-                    if hasattr(driver, "control_percent"):
-                        driver.control_percent(100.0)
-                    elif hasattr(driver, "set_power_percent"):
-                        driver.set_power_percent(100.0)
+                    with transport.arbiter.operation("control"):
+                        if hasattr(driver, "control_percent"):
+                            driver.control_percent(100.0)
+                        elif hasattr(driver, "set_power_percent"):
+                            driver.set_power_percent(100.0)
                     logger.info(f"[ControlService] Reset to 100 percent limit cho Inv ID {inv.id}")
                 except Exception as e:
                     logger.error(f"[ControlService] Reset Modbus fail limit Inv {inv.id}: {e}")

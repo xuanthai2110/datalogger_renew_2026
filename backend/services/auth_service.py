@@ -1,27 +1,22 @@
-import requests
-import logging
 import json
+import logging
 import os
+
+import requests
+
 from backend.core import config as _cfg
 
-# URL và TOKEN_FILE lấy từ config
 API_BASE_URL = _cfg.API_BASE_URL
-TOKEN_FILE   = _cfg.TOKEN_FILE
-
-# Credentials KHÔNG lưu cứng — đọc từ biến môi trường
-# Export trước khi chạy: export API_USERNAME=xxx API_PASSWORD=yyy
-API_USERNAME = os.environ.get("API_USERNAME", "")
-API_PASSWORD = os.environ.get("API_PASSWORD", "")
-
-if not API_USERNAME or not API_PASSWORD:
-    logging.getLogger(__name__).warning(
-        "[Auth] API_USERNAME / API_PASSWORD not set in environment. "
-        "Upload to server will fail. Set env vars before running."
-    )
+TOKEN_FILE = _cfg.TOKEN_FILE
 
 logger = logging.getLogger(__name__)
 
-MAX_LOGIN_RETRIES = 1  # số lần retry khi login thất bại
+MAX_LOGIN_RETRIES = 1
+
+
+def _get_credentials() -> tuple[str, str]:
+    # Read env at login time so credentials can be set after module import.
+    return os.environ.get("API_USERNAME", ""), os.environ.get("API_PASSWORD", "")
 
 
 class AuthService:
@@ -30,23 +25,14 @@ class AuthService:
         self.refresh_token: str | None = None
         self._load_tokens()
 
-    # ------------------------------------------------------------------
-    # PUBLIC
-    # ------------------------------------------------------------------
-
     def get_access_token(self) -> str | None:
-        """Trả về access token hợp lệ.
-        Nếu chưa có trong RAM → Thử load từ disk.
-        Nếu vẫn chưa có → login.
-                """
+        """Return a valid access token if available."""
         if not self.access_token:
             self._login()
-
         return self.access_token
+
     def refresh_access_token(self) -> bool:
-        """Dùng refresh_token để lấy access_token mới.
-        Trả về True nếu thành công, False nếu thất bại.
-        """
+        """Use refresh_token to get a new access_token."""
         if not self.refresh_token:
             logger.warning("[Auth] No refresh_token available, will re-login")
             return False
@@ -61,37 +47,31 @@ class AuthService:
             if response.status_code == 200:
                 data = response.json()
                 self.access_token = data.get("access_token")
-                # Một số API trả về refresh_token mới kèm theo
                 new_refresh = data.get("refresh_token")
                 if new_refresh:
                     self.refresh_token = new_refresh
-                
+
                 self._save_tokens()
                 logger.info("[Auth] Access token refreshed successfully")
                 return True
-            else:
-                logger.warning(
-                    f"[Auth] Refresh failed (status={response.status_code}), will re-login"
-                )
-                self._clear_tokens()
-                return False
+
+            logger.warning(
+                f"[Auth] Refresh failed (status={response.status_code}), will re-login"
+            )
+            self._clear_tokens()
+            return False
         except Exception as e:
             logger.error(f"[Auth] Refresh error: {e}")
             self._clear_tokens()
             return False
 
     def handle_unauthorized(self) -> str | None:
-        """Gọi khi nhận 401 từ API.
-        Thứ tự: refresh → re-login → retry login → None.
-        Trả về access_token mới nếu thành công, None nếu không phục hồi được.
-        """
+        """Recover after a 401 response from the API."""
         logger.info("[Auth] Handling 401 - attempting token refresh...")
 
-        # Bước 1: thử refresh
         if self.refresh_access_token():
             return self.access_token
 
-        # Bước 2: refresh thất bại → login lại
         logger.info("[Auth] Refresh failed, re-logging in...")
         if self._login():
             return self.access_token
@@ -99,15 +79,11 @@ class AuthService:
         logger.error("[Auth] All authentication attempts failed, giving up")
         return None
 
-    # ------------------------------------------------------------------
-    # PRIVATE
-    # ------------------------------------------------------------------
-
     def _load_tokens(self):
-        """Load tokens từ file nếu tồn tại."""
+        """Load tokens from disk if present."""
         if os.path.exists(TOKEN_FILE):
             try:
-                with open(TOKEN_FILE, 'r') as f:
+                with open(TOKEN_FILE, "r") as f:
                     data = json.load(f)
                     self.access_token = data.get("access_token")
                     self.refresh_token = data.get("refresh_token")
@@ -116,34 +92,38 @@ class AuthService:
                 logger.error(f"[Auth] Error loading tokens: {e}")
 
     def _save_tokens(self):
-        """Lưu tokens xuống file."""
+        """Persist tokens to disk."""
         try:
             data = {
                 "access_token": self.access_token,
-                "refresh_token": self.refresh_token
+                "refresh_token": self.refresh_token,
             }
-            with open(TOKEN_FILE, 'w') as f:
+            with open(TOKEN_FILE, "w") as f:
                 json.dump(data, f)
             logger.info("[Auth] Tokens saved to disk")
         except Exception as e:
             logger.error(f"[Auth] Error saving tokens: {e}")
 
     def _login(self) -> bool:
-        """Thực hiện login với retry MAX_LOGIN_RETRIES lần.
-        Trả về True nếu thành công.
-        Dùng OAuth2 Password Flow: POST /api/auth/token với form-encoded body.
-        """
+        """Login with OAuth2 password flow."""
+        api_username, api_password = _get_credentials()
+        if not api_username or not api_password:
+            logger.warning(
+                "[Auth] API_USERNAME / API_PASSWORD not set in environment. "
+                "Upload to server will fail. Set env vars before running."
+            )
+            return False
+
         url = f"{API_BASE_URL}/api/auth/token"
-        # OAuth2 Password Flow yêu cầu application/x-www-form-urlencoded
         payload = {
-            "username": API_USERNAME,
-            "password": API_PASSWORD,
+            "username": api_username,
+            "password": api_password,
             "grant_type": "password",
         }
 
-        for attempt in range(1, MAX_LOGIN_RETRIES + 2):  # lần 1 + 1 retry
+        for attempt in range(1, MAX_LOGIN_RETRIES + 2):
             try:
-                response = requests.post(url, data=payload, timeout=10)  # data= form-encoded
+                response = requests.post(url, data=payload, timeout=10)
                 if response.status_code == 200:
                     data = response.json()
                     self.access_token = data.get("access_token")
@@ -151,10 +131,10 @@ class AuthService:
                     self._save_tokens()
                     logger.info("[Auth] Login successful")
                     return True
-                else:
-                    logger.warning(
-                        f"[Auth] Login attempt {attempt} failed (status={response.status_code})"
-                    )
+
+                logger.warning(
+                    f"[Auth] Login attempt {attempt} failed (status={response.status_code})"
+                )
             except Exception as e:
                 logger.warning(f"[Auth] Login attempt {attempt} error: {e}")
 

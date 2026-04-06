@@ -1,8 +1,10 @@
-
-
 import logging
+
 from pymodbus.client import ModbusSerialClient
 from pymodbus.exceptions import ModbusIOException
+
+from backend.communication.modbus_arbiter import ModbusBusArbiter
+
 
 logger = logging.getLogger(__name__)
 
@@ -20,6 +22,7 @@ class ModbusRTU:
     ):
         self.port = port
         self.retries = retries
+        self.arbiter = ModbusBusArbiter(f"rtu://{port}")
 
         self.client = ModbusSerialClient(
             port=port,
@@ -30,9 +33,6 @@ class ModbusRTU:
             timeout=timeout,
         )
 
-    # ------------------------------------------------------
-    # CONNECTION
-    # ------------------------------------------------------
     def connect(self) -> bool:
         try:
             if not self.client.connect():
@@ -51,44 +51,37 @@ class ModbusRTU:
         except Exception as e:
             logger.error(f"[RTU] Close error: {e}")
 
-    # ------------------------------------------------------
-    # RETRY WRAPPER
-    # ------------------------------------------------------
     def _retry(self, func, *args, **kwargs):
         last_error = None
 
-        for attempt in range(1, self.retries + 1):
-            try:
-                response = func(*args, **kwargs)
+        self.arbiter.acquire()
+        try:
+            for attempt in range(1, self.retries + 1):
+                try:
+                    response = func(*args, **kwargs)
 
-                # pymodbus sometimes returns ModbusIOException instead of raising
-                if isinstance(response, ModbusIOException):
-                    last_error = response
+                    if isinstance(response, ModbusIOException):
+                        last_error = response
+                        logger.warning(
+                            f"[RTU] Attempt {attempt}/{self.retries} failed: {response}"
+                        )
+                        continue
+
+                    return response
+
+                except Exception as e:
+                    last_error = e
                     logger.warning(
-                        f"[RTU] Attempt {attempt}/{self.retries} failed: {response}"
+                        f"[RTU] Attempt {attempt}/{self.retries} exception: {e}"
                     )
-                    continue
-
-                return response
-
-            except Exception as e:
-                last_error = e
-                logger.warning(
-                    f"[RTU] Attempt {attempt}/{self.retries} exception: {e}"
-                )
+        finally:
+            self.arbiter.release()
 
         raise ConnectionError(
             f"[RTU] Communication failed after {self.retries} retries: {last_error}"
         )
 
-    # ------------------------------------------------------
-    # READ FUNCTIONS
-    # ------------------------------------------------------
     def read_input_registers(self, address: int, count: int, slave: int = 1):
-        """
-        FC=04
-        address must be 0-based (wire address)
-        """
         try:
             return self._retry(
                 self.client.read_input_registers,
@@ -105,9 +98,6 @@ class ModbusRTU:
             )
 
     def read_holding_registers(self, address: int, count: int, slave: int = 1):
-        """
-        FC=03
-        """
         try:
             return self._retry(
                 self.client.read_holding_registers,
@@ -123,13 +113,7 @@ class ModbusRTU:
                 unit=slave,
             )
 
-    # ------------------------------------------------------
-    # WRITE FUNCTIONS
-    # ------------------------------------------------------
     def write_single_register(self, address: int, value: int, slave: int = 1):
-        """
-        FC=06
-        """
         value = int(value) & 0xFFFF
 
         try:
@@ -148,9 +132,6 @@ class ModbusRTU:
             )
 
     def write_multiple_registers(self, address: int, values, slave: int = 1):
-        """
-        FC=16
-        """
         try:
             return self._retry(
                 self.client.write_registers,
@@ -166,6 +147,5 @@ class ModbusRTU:
                 unit=slave,
             )
 
-    # Alias để driver gọi write_register cho tiện
     def write_register(self, address: int, value: int, slave: int = 1):
         return self.write_single_register(address, value, slave=slave)

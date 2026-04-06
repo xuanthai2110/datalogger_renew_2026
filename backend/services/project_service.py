@@ -8,7 +8,6 @@ import requests
 import time
 import threading
 from backend.core.config import API_BASE_URL
-from backend.services.auth_service import AuthService
 
 logger = logging.getLogger(__name__)
 
@@ -17,7 +16,6 @@ class ProjectService:
         self.metadata_db = metadata_db
         self.realtime_db = realtime_db
         self.cache_db = cache_db
-        self.auth = AuthService()
 
     # ==============================
     # PROJECT

@@ -5,8 +5,12 @@ Compatible with pymodbus 2.x and 3.x
 """
 
 import logging
+
 from pymodbus.client import ModbusTcpClient
 from pymodbus.exceptions import ModbusIOException
+
+from backend.communication.modbus_arbiter import ModbusBusArbiter
+
 
 logger = logging.getLogger(__name__)
 
@@ -22,6 +26,7 @@ class ModbusTCP:
         self.host = host
         self.port = port
         self.retries = retries
+        self.arbiter = ModbusBusArbiter(f"tcp://{host}:{port}")
 
         self.client = ModbusTcpClient(
             host=host,
@@ -29,9 +34,6 @@ class ModbusTCP:
             timeout=timeout,
         )
 
-    # ------------------------------------------------------
-    # CONNECTION
-    # ------------------------------------------------------
     def connect(self) -> bool:
         try:
             if not self.client.connect():
@@ -50,47 +52,40 @@ class ModbusTCP:
         except Exception as e:
             logger.error(f"[TCP] Close error: {e}")
 
-    # ------------------------------------------------------
-    # RETRY WRAPPER
-    # ------------------------------------------------------
     def _retry(self, func, *args, **kwargs):
         last_error = None
 
-        for attempt in range(1, self.retries + 1):
-            try:
-                # Auto reconnect nếu cần
-                if not self.client.connected:
-                    self.client.connect()
+        self.arbiter.acquire()
+        try:
+            for attempt in range(1, self.retries + 1):
+                try:
+                    if not self.client.connected:
+                        self.client.connect()
 
-                response = func(*args, **kwargs)
+                    response = func(*args, **kwargs)
 
-                if isinstance(response, ModbusIOException):
-                    last_error = response
+                    if isinstance(response, ModbusIOException):
+                        last_error = response
+                        logger.warning(
+                            f"[TCP] Attempt {attempt}/{self.retries} failed: {response}"
+                        )
+                        continue
+
+                    return response
+
+                except Exception as e:
+                    last_error = e
                     logger.warning(
-                        f"[TCP] Attempt {attempt}/{self.retries} failed: {response}"
+                        f"[TCP] Attempt {attempt}/{self.retries} exception: {e}"
                     )
-                    continue
-
-                return response
-
-            except Exception as e:
-                last_error = e
-                logger.warning(
-                    f"[TCP] Attempt {attempt}/{self.retries} exception: {e}"
-                )
+        finally:
+            self.arbiter.release()
 
         raise ConnectionError(
             f"[TCP] Communication failed after {self.retries} retries: {last_error}"
         )
 
-    # ------------------------------------------------------
-    # READ FUNCTIONS
-    # ------------------------------------------------------
     def read_input_registers(self, address: int, count: int, slave: int = 1):
-        """
-        FC=04
-        address must be 0-based (wire address)
-        """
         try:
             return self._retry(
                 self.client.read_input_registers,
@@ -107,9 +102,6 @@ class ModbusTCP:
             )
 
     def read_holding_registers(self, address: int, count: int, slave: int = 1):
-        """
-        FC=03
-        """
         try:
             return self._retry(
                 self.client.read_holding_registers,
@@ -125,13 +117,7 @@ class ModbusTCP:
                 unit=slave,
             )
 
-    # ------------------------------------------------------
-    # WRITE FUNCTIONS
-    # ------------------------------------------------------
     def write_single_register(self, address: int, value: int, slave: int = 1):
-        """
-        FC=06
-        """
         value = int(value) & 0xFFFF
 
         try:
@@ -150,9 +136,6 @@ class ModbusTCP:
             )
 
     def write_multiple_registers(self, address: int, values, slave: int = 1):
-        """
-        FC=16
-        """
         try:
             return self._retry(
                 self.client.write_registers,
@@ -168,6 +151,5 @@ class ModbusTCP:
                 unit=slave,
             )
 
-    # Alias cho driver
     def write_register(self, address: int, value: int, slave: int = 1):
         return self.write_single_register(address, value, slave=slave)

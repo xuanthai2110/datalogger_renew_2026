@@ -1,5 +1,6 @@
 import time
 import logging
+import threading
 from datetime import datetime, timezone
 from typing import Dict, Any, List, Optional
 
@@ -22,26 +23,28 @@ class PollingService:
         self.normalization = NormalizationService()
         self.fault_service = FaultService(None, None)
         self.transports = {}
+        self._transport_lock = threading.Lock()
         
         # Caching logic
         self._config_cache = []
         self._last_refresh = 0
 
     def _get_transport(self, brand: str):
-        if "Huawei" in brand:
-            key = f"TCP_{config.MODBUS_TCP_HOST}"
-            if key not in self.transports:
-                t = ModbusTCP(host=config.MODBUS_TCP_HOST, port=config.MODBUS_TCP_PORT)
-                t.connect()
-                self.transports[key] = t
-            return self.transports[key]
-        else:
-            key = "RTU"
-            if key not in self.transports:
-                t = ModbusRTU(port=config.MODBUS_PORT, baudrate=config.MODBUS_BAUDRATE)
-                t.connect()
-                self.transports[key] = t
-            return self.transports[key]
+        with self._transport_lock:
+            if "Huawei" in brand:
+                key = f"TCP_{config.MODBUS_TCP_HOST}"
+                if key not in self.transports:
+                    t = ModbusTCP(host=config.MODBUS_TCP_HOST, port=config.MODBUS_TCP_PORT)
+                    t.connect()
+                    self.transports[key] = t
+                return self.transports[key]
+            else:
+                key = "RTU"
+                if key not in self.transports:
+                    t = ModbusRTU(port=config.MODBUS_PORT, baudrate=config.MODBUS_BAUDRATE)
+                    t.connect()
+                    self.transports[key] = t
+                return self.transports[key]
 
     def get_polling_config(self) -> List[Dict[str, Any]]:
         """Lấy cấu hình polling (Projects & Inverters) từ RAM Cache hoặc Database"""
@@ -84,8 +87,9 @@ class PollingService:
                 transport = self._get_transport(inv.brand)
                 driver = self._get_driver(inv.brand, transport, inv.slave_id)
                 if not driver: continue
-                
-                raw_data = driver.read_all()
+
+                with transport.arbiter.operation("polling"):
+                    raw_data = driver.read_all()
                 if not raw_data: 
                     logger.warning(f"Inverter {inv.id} (Slave {inv.slave_id}) failed to respond.")
                     continue
