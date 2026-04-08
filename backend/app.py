@@ -99,7 +99,11 @@ def index():
 
 if __name__ == "__main__":
     import uvicorn
-    host = app_config.WEB_HOST
+    bind_host = app_config.WEB_BIND_HOST
+    public_host = app_config.WEB_PUBLIC_HOST
     port = app_config.WEB_PORT
-    logger.info(f"Starting Solar Datalogger Backend on http://{host}:{port}")
-    uvicorn.run("backend.app:app", host=host, port=port, reload=True)
+    logger.info(
+        f"Starting Solar Datalogger Backend on http://{public_host}:{port} "
+        f"(bind {bind_host}:{port})"
+    )
+    uvicorn.run("backend.app:app", host=bind_host, port=port, reload=True)

@@ -21,11 +21,12 @@ from backend.core import settings
 if __name__ == "__main__":
     print("=" * 50)
     print("  Datalogger Local Web UI")
-    print(f"  http://{settings.WEB_HOST}:{settings.WEB_PORT}")
+    print(f"  http://{settings.WEB_PUBLIC_HOST}:{settings.WEB_PORT}")
+    print(f"  bind -> {settings.WEB_BIND_HOST}:{settings.WEB_PORT}")
     print("=" * 50)
     uvicorn.run(
         "backend.app:app",
-        host=settings.WEB_HOST,
+        host=settings.WEB_BIND_HOST,
         port=settings.WEB_PORT,
         reload=False,
         log_level="info"
