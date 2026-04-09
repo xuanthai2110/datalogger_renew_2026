@@ -22,7 +22,8 @@ class ScheduleService:
 
     def _remote_schedule_url(self, schedule_id: int) -> str:
         base = API_BASE_URL.rstrip("/")
-        return f"{base}/api/control_schedules/{schedule_id}"
+        # Fix: sử dụng gạch ngang (-) thay vì gạch dưới (_) theo yêu cầu server
+        return f"{base}/api/control-schedules/{schedule_id}"
 
     def _short_body(self, value, limit: int = 500) -> str:
         text = value if isinstance(value, str) else str(value)
