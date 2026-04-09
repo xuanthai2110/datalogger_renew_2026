@@ -8,6 +8,9 @@ services:
       - "5000:5000"
     env_file:
       - .env
+    devices:
+      # Web API also uses RTU during scan/setup flows
+      - "/dev/ttyUSB0:/dev/ttyUSB0"
     volumes:
       - ./backend/db_manager/data:/app/backend/db_manager/data
       - /dev/shm:/dev/shm
