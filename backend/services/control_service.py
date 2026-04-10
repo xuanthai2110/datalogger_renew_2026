@@ -120,25 +120,102 @@ class ControlService:
             driver = self.polling_service._get_driver(inv.brand, transport, inv.slave_id)
 
             if not driver:
+                logger.error(f"[ControlService] No driver resolved for inverter {inv.id} ({inv.brand}).")
+                success = False
                 continue
 
             try:
                 with transport.arbiter.operation("control"):
                     if schedule.mode == "MAXP" and schedule.limit_watts is not None:
+                        method_name = None
+                        command_ok = False
+
                         if hasattr(driver, "control_P"):
-                            driver.control_P(schedule.limit_watts / 1000.0)
+                            method_name = "control_P"
+                            command_ok = bool(driver.control_P(schedule.limit_watts / 1000.0))
                         elif hasattr(driver, "set_power_w"):
-                            driver.set_power_w(schedule.limit_watts)
+                            method_name = "set_power_w"
+                            command_ok = bool(driver.set_power_w(schedule.limit_watts))
                         elif hasattr(driver, "set_power_kw"):
-                            driver.set_power_kw(schedule.limit_watts / 1000.0)
-                        logger.info(f"[ControlService] Set {schedule.limit_watts}W cho Inv ID {inv.id}")
+                            method_name = "set_power_kw"
+                            command_ok = bool(driver.set_power_kw(schedule.limit_watts / 1000.0))
+                        elif hasattr(driver, "write_power_limit_kw"):
+                            method_name = "write_power_limit_kw"
+                            enable_ok = True
+                            if hasattr(driver, "enable_power_limit"):
+                                enable_ok = bool(driver.enable_power_limit(True))
+                            command_ok = enable_ok and bool(driver.write_power_limit_kw(schedule.limit_watts / 1000.0))
+
+                        if not method_name:
+                            logger.error(
+                                "[ControlService] Driver %s does not support MAXP control for Inv ID %s",
+                                driver.__class__.__name__,
+                                inv.id,
+                            )
+                            success = False
+                            continue
+                        if not command_ok:
+                            logger.error(
+                                "[ControlService] Driver %s failed MAXP control for Inv ID %s",
+                                driver.__class__.__name__,
+                                inv.id,
+                            )
+                            success = False
+                            continue
+                        logger.info(
+                            "[ControlService] Set %sW cho Inv ID %s via %s",
+                            schedule.limit_watts,
+                            inv.id,
+                            method_name,
+                        )
 
                     elif schedule.mode == "LIMIT_PERCENT" and schedule.limit_percent is not None:
+                        method_name = None
+                        command_ok = False
+
                         if hasattr(driver, "control_percent"):
-                            driver.control_percent(schedule.limit_percent)
+                            method_name = "control_percent"
+                            command_ok = bool(driver.control_percent(schedule.limit_percent))
                         elif hasattr(driver, "set_power_percent"):
-                            driver.set_power_percent(schedule.limit_percent)
-                        logger.info(f"[ControlService] Set {schedule.limit_percent} percent cho Inv ID {inv.id}")
+                            method_name = "set_power_percent"
+                            command_ok = bool(driver.set_power_percent(schedule.limit_percent))
+                        elif hasattr(driver, "write_power_limit_percent"):
+                            method_name = "write_power_limit_percent"
+                            enable_ok = True
+                            if hasattr(driver, "enable_power_limit"):
+                                enable_ok = bool(driver.enable_power_limit(True))
+                            command_ok = enable_ok and bool(driver.write_power_limit_percent(schedule.limit_percent))
+
+                        if not method_name:
+                            logger.error(
+                                "[ControlService] Driver %s does not support LIMIT_PERCENT control for Inv ID %s",
+                                driver.__class__.__name__,
+                                inv.id,
+                            )
+                            success = False
+                            continue
+                        if not command_ok:
+                            logger.error(
+                                "[ControlService] Driver %s failed LIMIT_PERCENT control for Inv ID %s",
+                                driver.__class__.__name__,
+                                inv.id,
+                            )
+                            success = False
+                            continue
+                        logger.info(
+                            "[ControlService] Set %s percent cho Inv ID %s via %s",
+                            schedule.limit_percent,
+                            inv.id,
+                            method_name,
+                        )
+                    else:
+                        logger.error(
+                            "[ControlService] Unsupported inverter schedule payload: mode=%s limit_watts=%s limit_percent=%s",
+                            schedule.mode,
+                            schedule.limit_watts,
+                            schedule.limit_percent,
+                        )
+                        success = False
             except Exception as e:
                 logger.error(f"[ControlService] Modbus write fail on Inv {inv.id}: {e}")
                 success = False
@@ -151,15 +228,45 @@ class ControlService:
             transport = self.polling_service._get_transport(inv.brand)
             driver = self.polling_service._get_driver(inv.brand, transport, inv.slave_id)
             if not driver:
+                logger.error(f"[ControlService] No driver resolved for inverter {inv.id} ({inv.brand}) during reset.")
+                success = False
                 continue
 
             try:
                 with transport.arbiter.operation("control"):
+                    method_name = None
+                    command_ok = False
+
                     if hasattr(driver, "control_percent"):
-                        driver.control_percent(100.0)
+                        method_name = "control_percent"
+                        command_ok = bool(driver.control_percent(100.0))
                     elif hasattr(driver, "set_power_percent"):
-                        driver.set_power_percent(100.0)
-                logger.info(f"[ControlService] Reset to 100 percent limit cho Inv ID {inv.id}")
+                        method_name = "set_power_percent"
+                        command_ok = bool(driver.set_power_percent(100.0))
+                    elif hasattr(driver, "write_power_limit_percent"):
+                        method_name = "write_power_limit_percent"
+                        enable_ok = True
+                        if hasattr(driver, "enable_power_limit"):
+                            enable_ok = bool(driver.enable_power_limit(True))
+                        command_ok = enable_ok and bool(driver.write_power_limit_percent(100.0))
+
+                    if not method_name:
+                        logger.error(
+                            "[ControlService] Driver %s does not support reset by percent for Inv ID %s",
+                            driver.__class__.__name__,
+                            inv.id,
+                        )
+                        success = False
+                        continue
+                    if not command_ok:
+                        logger.error(
+                            "[ControlService] Driver %s failed reset by percent for Inv ID %s",
+                            driver.__class__.__name__,
+                            inv.id,
+                        )
+                        success = False
+                        continue
+                logger.info(f"[ControlService] Reset to 100 percent limit cho Inv ID {inv.id} via {method_name}")
             except Exception as e:
                 logger.error(f"[ControlService] Reset Modbus fail limit Inv {inv.id}: {e}")
                 success = False

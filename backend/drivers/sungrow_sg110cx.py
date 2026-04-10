@@ -324,26 +324,34 @@ class SungrowSG110CXDriver(BaseDriver):
     # ================= CONTROL ===============================
     # =========================================================
 
+    @staticmethod
+    def _ensure_write_ok(response, action: str) -> bool:
+        if response is None:
+            raise Exception(f"{action} returned no response")
+        if hasattr(response, "isError") and response.isError():
+            raise Exception(f"{action} failed: {response}")
+        return True
+
     def enable_power_limit(self, enable: bool) -> bool:
-        self.transport.write_register(
+        response = self.transport.write_register(
             address=6000,
             value=1 if enable else 0,
             slave=self.slave_id,
         )
-        return True
+        return self._ensure_write_ok(response, f"Enable power limit={enable}")
 
     def write_power_limit_kw(self, kw: float) -> bool:
-        self.transport.write_register(
+        response = self.transport.write_register(
             address=6001,
             value=int(kw * 10),
             slave=self.slave_id,
         )
-        return True
+        return self._ensure_write_ok(response, f"Write kW limit {kw}")
 
     def write_power_limit_percent(self, percent: float) -> bool:
-        self.transport.write_register(
+        response = self.transport.write_register(
             address=6002,
             value=int(percent * 10),
             slave=self.slave_id,
         )
-        return True
+        return self._ensure_write_ok(response, f"Write percent limit {percent}")

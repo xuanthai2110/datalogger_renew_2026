@@ -402,19 +402,27 @@ class HuaweiSUN2000(BaseDriver):
     def write_power_limit_kw(self, kw: float) -> bool:
         return self.set_power_kw(kw)
 
+    @staticmethod
+    def _ensure_write_ok(response, action: str) -> bool:
+        if response is None:
+            raise Exception(f"{action} returned no response")
+        if hasattr(response, "isError") and response.isError():
+            raise Exception(f"{action} failed: {response}")
+        return True
+
     def set_power_percent(self, percent):
 
         addr = 40125
 
         value = int(percent * 10)
 
-        self.transport.write_register(
+        response = self.transport.write_register(
             address=addr,
             value=value,
             slave=self.slave_id
         )
 
-        return True
+        return self._ensure_write_ok(response, f"Write percent limit {percent}")
 
 
     # --------------------------------
@@ -426,13 +434,13 @@ class HuaweiSUN2000(BaseDriver):
 
         value = int(kw * 10)
 
-        self.transport.write_register(
+        response = self.transport.write_register(
             address=addr,
             value=value,
             slave=self.slave_id
         )
 
-        return True
+        return self._ensure_write_ok(response, f"Write kW limit {kw}")
 
 
     # --------------------------------
@@ -448,13 +456,13 @@ class HuaweiSUN2000(BaseDriver):
         low = watt & 0xFFFF
 
         # Thay vì viết thuần pymodbus, ta sử dụng method write_multiple_registers của communication ModbusTCP
-        self.transport.write_multiple_registers(
+        response = self.transport.write_multiple_registers(
             address=addr,
             values=[high, low],
             slave=self.slave_id
         )
 
-        return True
+        return self._ensure_write_ok(response, f"Write watt limit {watt}")
 
 
     # --------------------------------

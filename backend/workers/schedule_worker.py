@@ -49,9 +49,10 @@ class ScheduleWorker(threading.Thread):
 
                         if start_time <= now <= end_time:
                             if s.status == "SCHEDULED":
-                                self.schedule_service.update_status(s.id, "RUNNING", sync_remote=True)
                                 success = self.control_service.apply(s)
-                                if not success:
+                                if success:
+                                    self.schedule_service.update_status(s.id, "RUNNING", sync_remote=True)
+                                else:
                                     self.schedule_service.update_status(s.id, "FAILED", sync_remote=True)
                         elif now > end_time:
                             if s.status == "RUNNING":
