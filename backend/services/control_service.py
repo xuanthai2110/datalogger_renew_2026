@@ -133,9 +133,6 @@ class ControlService:
                         if hasattr(driver, "control_P"):
                             method_name = "control_P"
                             command_ok = bool(driver.control_P(schedule.limit_watts / 1000.0))
-                        elif hasattr(driver, "set_power_w"):
-                            method_name = "set_power_w"
-                            command_ok = bool(driver.set_power_w(schedule.limit_watts))
                         elif hasattr(driver, "set_power_kw"):
                             method_name = "set_power_kw"
                             command_ok = bool(driver.set_power_kw(schedule.limit_watts / 1000.0))
@@ -145,6 +142,9 @@ class ControlService:
                             if hasattr(driver, "enable_power_limit"):
                                 enable_ok = bool(driver.enable_power_limit(True))
                             command_ok = enable_ok and bool(driver.write_power_limit_kw(schedule.limit_watts / 1000.0))
+                        elif hasattr(driver, "set_power_w"):
+                            method_name = "set_power_w"
+                            command_ok = bool(driver.set_power_w(schedule.limit_watts))
 
                         if not method_name:
                             logger.error(
