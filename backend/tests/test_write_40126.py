@@ -9,8 +9,8 @@ DEFAULT_PORT = 502
 DEFAULT_SLAVE_ID = 9
 DEFAULT_KW = 50.0
 DEFAULT_RESET_PERCENT = 100.0
-DEFAULT_DELAY_1 = 10.0
-DEFAULT_DELAY_2 = 20.0
+DEFAULT_DELAY_1 = 100.0
+DEFAULT_DELAY_2 = 100.0
 
 
 def read_power(client: ModbusTcpClient, slave_id: int, label: str):
