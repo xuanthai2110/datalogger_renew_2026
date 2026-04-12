@@ -12,6 +12,24 @@ class UploaderService:
         self.auth = AuthService()
         self.token = None
 
+    def _should_delete_outbox_record(self, response) -> bool:
+        """Drop records already accepted earlier by the server."""
+        if response.status_code != 409:
+            return False
+
+        response_text = response.text or ""
+        try:
+            body = response.json()
+            if isinstance(body, dict):
+                detail = body.get("detail")
+                if isinstance(detail, str):
+                    response_text = detail
+        except (ValueError, json.JSONDecodeError, AttributeError, TypeError):
+            pass
+
+        normalized = response_text.casefold()
+        return "da ton tai" in normalized or "đã tồn tại" in normalized or "already exists" in normalized
+
     def upload(self):
         token = self.auth.get_access_token()
         if not token: return
@@ -32,6 +50,12 @@ class UploaderService:
                 if response.status_code in (200, 201):
                     self.db.delete_from_outbox(data["id"])
                     logger.info(f"Uploaded project {server_id} (status={response.status_code})")
+                elif self._should_delete_outbox_record(response):
+                    self.db.delete_from_outbox(data["id"])
+                    logger.info(
+                        f"Dropped duplicate outbox record for project {server_id} "
+                        f"(status={response.status_code}): {response.text}"
+                    )
                 else:
                     logger.warning(f"Upload failed for project {server_id} (status={response.status_code}): {response.text}")
             except Exception as e:
