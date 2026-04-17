@@ -99,6 +99,16 @@ class ScheduleService:
             logger.info("[ScheduleService] GET %s attempt=%s/%s", url, attempt, self.fetch_retry_count)
             try:
                 response = requests.get(url, headers=headers, timeout=10)
+                
+                # Handle 401 Unauthorized
+                if response.status_code == 401:
+                    logger.warning(f"[ScheduleService] Unauthorized (401) on fetch. Attempting token renewal...")
+                    new_token = self.auth.handle_unauthorized()
+                    if new_token:
+                        headers["Authorization"] = f"Bearer {new_token}"
+                        logger.info(f"[ScheduleService] Retrying fetch with new token...")
+                        response = requests.get(url, headers=headers, timeout=10)
+
                 logger.info(
                     "[ScheduleService] GET %s -> status=%s body=%s",
                     url,
@@ -164,6 +174,16 @@ class ScheduleService:
         logger.info("[ScheduleService] PATCH %s payload=%s", url, payload)
         try:
             response = requests.patch(url, json=payload, headers=headers, timeout=10)
+            
+            # Handle 401 Unauthorized
+            if response.status_code == 401:
+                logger.warning(f"[ScheduleService] Unauthorized (401) on patch. Attempting token renewal...")
+                new_token = self.auth.handle_unauthorized()
+                if new_token:
+                    headers["Authorization"] = f"Bearer {new_token}"
+                    logger.info(f"[ScheduleService] Retrying patch with new token...")
+                    response = requests.patch(url, json=payload, headers=headers, timeout=10)
+
             logger.info(
                 "[ScheduleService] PATCH %s -> status=%s body=%s",
                 url,

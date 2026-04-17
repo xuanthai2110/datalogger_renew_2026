@@ -15,71 +15,124 @@ UNIFIED_FAULTS = {
     1007: "GRID_POWER_OUTAGE", 1008: "GRID_VOLTAGE_UNBALANCE", 1009: "GRID_PHASE_LOSS",
     1010: "GRID_ABNORMAL", 1011: "GRID_10MIN_OVERVOLTAGE", 1012: "GRID_IMPEDANCE_ABNORMAL",
     1013: "GRID_REVERSE_POWER", 1014: "GRID_CONNECTION_LOST", 1015: "GRID_PROTECTION_TRIGGERED",
+    1016: "GRID_PHASE_CONFRONTATION", 
+    
     # PV
     1101: "PV_REVERSE_CONNECTION", 1102: "PV_OVERVOLTAGE", 1103: "PV_CONFIGURATION_ERROR",
     1104: "PV_INPUT_ABNORMAL", 1105: "PV_STRING_FAULT", 1106: "PV_STRING_LOSS",
     1107: "PV_STRING_IMBALANCE", 1108: "PV_LOW_VOLTAGE", 1109: "PV_DC_BUS_OVERVOLTAGE",
     1110: "PV_DC_BUS_UNDERVOLTAGE",
+    1111: "PV_STRING_REVERSE_ALARM", 
+
     # ELECTRICAL
     1201: "LEAKAGE_CURRENT", 1202: "LOW_INSULATION_RESISTANCE", 1203: "AC_OVERLOAD",
     1204: "AC_SHORT_CIRCUIT", 1205: "DC_OVER_CURRENT", 1206: "GROUND_FAULT",
     1207: "RESIDUAL_CURRENT_FAULT", 1208: "DC_COMPONENT_HIGH", 1209: "DC_INJECTION_HIGH",
+    
     # TEMPERATURE
     1301: "DEVICE_OVER_TEMPERATURE", 1302: "AMBIENT_OVER_TEMPERATURE", 1303: "AMBIENT_LOW_TEMPERATURE",
     1304: "HEATSINK_OVER_TEMPERATURE", 1305: "MODULE_OVER_TEMPERATURE",
+    
     # HARDWARE
     1401: "FAN_FAULT", 1402: "AC_SPD_FAULT", 1403: "DC_SPD_FAULT", 1404: "RELAY_FAULT",
     1405: "CONTACTOR_FAULT", 1406: "SENSOR_FAULT", 1407: "EEPROM_FAULT",
     1408: "INTERNAL_COMMUNICATION_FAULT", 1409: "CONTROL_BOARD_FAULT", 1410: "POWER_MODULE_FAULT",
+    1411: "DC_BUS_CAPACITOR_FAULT", 
+    
     # COMMUNICATION
     1501: "COMMUNICATION_FAULT", 1502: "METER_COMMUNICATION_FAULT", 1503: "RS485_COMMUNICATION_FAULT",
     1504: "MODBUS_COMMUNICATION_FAULT", 1505: "ETHERNET_COMMUNICATION_FAULT", 1506: "CLOUD_COMMUNICATION_FAULT",
+    1507: "METER_CT_REVERSE_CONNECTION", 
+
     # SAFETY
     1601: "ARC_FAULT", 1602: "ARC_DETECTION_DISABLED", 1603: "RAPID_SHUTDOWN_TRIGGERED",
     1604: "FIRE_PROTECTION_TRIGGERED", 1605: "EMERGENCY_STOP_TRIGGERED",
+    
     # SYSTEM
     1701: "DEVICE_ABNORMAL", 1702: "GRID_PROTECTION_SELF_CHECK_FAILURE", 1703: "SYSTEM_SELF_CHECK_FAILURE",
     1704: "SOFTWARE_EXCEPTION", 1705: "FIRMWARE_UPGRADE_FAILURE", 1706: "CONFIGURATION_ERROR",
+    1707: "SYSTEM_ALARM", 
+
     # DERATING
     1801: "POWER_DERATING", 1802: "TEMPERATURE_DERATING", 1803: "GRID_LIMIT_DERATING",
     1804: "FREQUENCY_DERATING", 1805: "POWER_LIMIT_CONTROL",
 }
 
 SUNGROW_FAULT_MAP = {
-    1: {"id_sungrow": 1, "id_unified": 1001, "name": "GRID_OVERVOLTAGE", "severity": "ERROR", "repair_instruction": "Check grid voltage and transformer tap setting."},
-    2: {"id_sungrow": 2, "id_unified": 1003, "name": "GRID_UNDERVOLTAGE", "severity": "ERROR", "repair_instruction": "Check grid voltage level and cable connection."},
-    3: {"id_sungrow": 3, "id_unified": 1005, "name": "GRID_OVERFREQUENCY", "severity": "ERROR", "repair_instruction": "Check grid frequency stability."},
-    4: {"id_sungrow": 4, "id_unified": 1006, "name": "GRID_UNDERFREQUENCY", "severity": "ERROR", "repair_instruction": "Check utility grid frequency."},
-    5: {"id_sungrow": 5, "id_unified": 1007, "name": "GRID_LOSS", "severity": "ERROR", "repair_instruction": "Check AC breaker and grid cable."},
-    6: {"id_sungrow": 6, "id_unified": 1009, "name": "GRID_PHASE_FAULT", "severity": "ERROR", "repair_instruction": "Check phase sequence and wiring."},
-    10: {"id_sungrow": 10, "id_unified": 1102, "name": "DC_OVERVOLTAGE", "severity": "ERROR", "repair_instruction": "Check PV string voltage."},
-    11: {"id_sungrow": 11, "id_unified": 1202, "name": "DC_INSULATION_FAULT", "severity": "ERROR", "repair_instruction": "Check insulation resistance between PV and ground."},
-    12: {"id_sungrow": 12, "id_unified": 1206, "name": "GROUND_FAULT", "severity": "ERROR", "repair_instruction": "Inspect grounding system."},
-    13: {"id_sungrow": 13, "id_unified": 1201, "name": "LEAKAGE_CURRENT", "severity": "ERROR", "repair_instruction": "Check residual current leakage."},
-    14: {"id_sungrow": 14, "id_unified": 1105, "name": "STRING_FAULT", "severity": "WARNING", "repair_instruction": "Inspect PV string current and connectors."},
-    20: {"id_sungrow": 20, "id_unified": 1301, "name": "OVER_TEMPERATURE", "severity": "ERROR", "repair_instruction": "Check inverter cooling and ambient temperature."},
-    21: {"id_sungrow": 21, "id_unified": 1401, "name": "FAN_FAULT", "severity": "WARNING", "repair_instruction": "Inspect cooling fan."},
-    22: {"id_sungrow": 22, "id_unified": 1304, "name": "HEATSINK_OVER_TEMP", "severity": "ERROR", "repair_instruction": "Check heat sink airflow."},
-    30: {"id_sungrow": 30, "id_unified": 1701, "name": "HARDWARE_FAULT", "severity": "ERROR", "repair_instruction": "Inspect inverter internal modules."},
-    31: {"id_sungrow": 31, "id_unified": 1704, "name": "SOFTWARE_FAULT", "severity": "ERROR", "repair_instruction": "Restart inverter or update firmware."},
-    32: {"id_sungrow": 32, "id_unified": 1410, "name": "POWER_MODULE_FAULT", "severity": "ERROR", "repair_instruction": "Check internal power module."},
-    33: {"id_sungrow": 33, "id_unified": 1109, "name": "BUS_OVERVOLTAGE", "severity": "ERROR", "repair_instruction": "Check DC bus voltage."},
-    34: {"id_sungrow": 34, "id_unified": 1110, "name": "BUS_UNDERVOLTAGE", "severity": "ERROR", "repair_instruction": "Inspect DC bus system."},
-    35: {"id_sungrow": 35, "id_unified": 1404, "name": "RELAY_FAULT", "severity": "ERROR", "repair_instruction": "Inspect AC relay."},
-    40: {"id_sungrow": 40, "id_unified": 1501, "name": "COMMUNICATION_FAULT", "severity": "DISCONNECT", "repair_instruction": "Check communication module and cable."},
-    41: {"id_sungrow": 41, "id_unified": 1503, "name": "RS485_FAULT", "severity": "DISCONNECT", "repair_instruction": "Check RS485 wiring."},
-    42: {"id_sungrow": 42, "id_unified": 1505, "name": "WIFI_FAULT", "severity": "DISCONNECT", "repair_instruction": "Inspect WiFi module."},
-    43: {"id_sungrow": 43, "id_unified": 1504, "name": "PLC_FAULT", "severity": "DISCONNECT", "repair_instruction": "Check PLC communication."},
-    44: {"id_sungrow": 44, "id_unified": 1502, "name": "METER_COMM_FAULT", "severity": "DISCONNECT", "repair_instruction": "Check smart meter communication."},
-    50: {"id_sungrow": 50, "id_unified": 1601, "name": "ARC_FAULT", "severity": "ERROR", "repair_instruction": "Inspect PV cables for arc fault."},
-    51: {"id_sungrow": 51, "id_unified": 1402, "name": "SPD_FAULT", "severity": "WARNING", "repair_instruction": "Check surge protection device."},
-    52: {"id_sungrow": 52, "id_unified": 1015, "name": "ANTI_ISLANDING_FAULT", "severity": "ERROR", "repair_instruction": "Check grid protection settings."},
-    60: {"id_sungrow": 60, "id_unified": 1703, "name": "STARTUP_FAIL", "severity": "ERROR", "repair_instruction": "Restart inverter and verify parameters."},
-    61: {"id_sungrow": 61, "id_unified": 1701, "name": "SHUTDOWN_FAULT", "severity": "ERROR", "repair_instruction": "Check shutdown cause."},
-    62: {"id_sungrow": 62, "id_unified": 1706, "name": "CONFIGURATION_FAULT", "severity": "ERROR", "repair_instruction": "Verify inverter configuration."},
-    70: {"id_sungrow": 70, "id_unified": 1406, "name": "CURRENT_SENSOR_FAULT", "severity": "ERROR", "repair_instruction": "Inspect current sensor."},
-    71: {"id_sungrow": 71, "id_unified": 1406, "name": "VOLTAGE_SENSOR_FAULT", "severity": "ERROR", "repair_instruction": "Inspect voltage sensing circuit."},
-    72: {"id_sungrow": 72, "id_unified": 1406, "name": "TEMPERATURE_SENSOR_FAULT", "severity": "ERROR", "repair_instruction": "Inspect temperature sensor."},
+    # --- GRID FAULTS ---
+    2: {"id_sungrow": 2, "id_unified": 1001, "name": "GRID_OVERVOLTAGE", "severity": "ERROR", "repair_instruction": "Check grid voltage and transformer tap setting."},
+    3: {"id_sungrow": 3, "id_unified": 1001, "name": "GRID_OVERVOLTAGE", "severity": "ERROR", "repair_instruction": "Check grid voltage and transformer tap setting."},
+    14: {"id_sungrow": 14, "id_unified": 1001, "name": "GRID_OVERVOLTAGE", "severity": "ERROR", "repair_instruction": "Check grid voltage at AC terminals."},
+    15: {"id_sungrow": 15, "id_unified": 1001, "name": "GRID_OVERVOLTAGE", "severity": "ERROR", "repair_instruction": "Check grid voltage at AC terminals."},
+    4: {"id_sungrow": 4, "id_unified": 1003, "name": "GRID_UNDERVOLTAGE", "severity": "ERROR", "repair_instruction": "Check grid voltage level and AC connection."},
+    5: {"id_sungrow": 5, "id_unified": 1003, "name": "GRID_UNDERVOLTAGE", "severity": "ERROR", "repair_instruction": "Check grid voltage level and AC connection."},
+    8: {"id_sungrow": 8, "id_unified": 1005, "name": "GRID_OVER_FREQUENCY", "severity": "ERROR", "repair_instruction": "Check grid frequency stability."},
+    9: {"id_sungrow": 9, "id_unified": 1006, "name": "GRID_UNDER_FREQUENCY", "severity": "ERROR", "repair_instruction": "Check utility grid frequency."},
+    10: {"id_sungrow": 10, "id_unified": 1007, "name": "GRID_POWER_OUTAGE", "severity": "ERROR", "repair_instruction": "Check AC circuit breaker and grid status."},
+    12: {"id_sungrow": 12, "id_unified": 1201, "name": "EXCESS_LEAKAGE_CURRENT", "severity": "ERROR", "repair_instruction": "Check insulation of PV strings and AC cables."},
+    13: {"id_sungrow": 13, "id_unified": 1010, "name": "GRID_ABNORMAL", "severity": "ERROR", "repair_instruction": "Check grid stability and connection status."},
+    17: {"id_sungrow": 17, "id_unified": 1008, "name": "GRID_VOLTAGE_UNBALANCE", "severity": "ERROR", "repair_instruction": "Check three-phase grid voltage balance."},
+    323: {"id_sungrow": 323, "id_unified": 1016, "name": "GRID_PHASE_CONFRONTATION", "severity": "ERROR", "repair_instruction": "Check grid connection and phase sequence."},
+
+    # --- PV & DC FAULTS (Bao gồm các dải mã 448-479, 532-595, 264-283) ---
+    28: {"id_sungrow": 28, "id_unified": 1101, "name": "PV_REVERSE_CONNECTION", "severity": "ERROR", "repair_instruction": "Check PV string polarity."},
+    29: {"id_sungrow": 29, "id_unified": 1101, "name": "PV_REVERSE_CONNECTION", "severity": "ERROR", "repair_instruction": "Check PV string polarity."},
+    208: {"id_sungrow": 208, "id_unified": 1101, "name": "PV_REVERSE_CONNECTION", "severity": "ERROR", "repair_instruction": "Check PV string polarity."},
+    
+    # PV Reserve Connection (Dải 448-479)
+    **{i: {"id_sungrow": i, "id_unified": 1101, "name": "PV_REVERSE_CONNECTION", "severity": "ERROR", "repair_instruction": "Check PV string polarity."} for i in range(448, 480)},
+    
+    # PV Reverse Connection Alarm (Dải 532-547 và 564-579)
+    **{i: {"id_sungrow": i, "id_unified": 1111, "name": "PV_STRING_REVERSE_ALARM", "severity": "WARNING", "repair_instruction": "Check PV string polarity."} for i in range(532, 548)},
+    **{i: {"id_sungrow": i, "id_unified": 1111, "name": "PV_STRING_REVERSE_ALARM", "severity": "WARNING", "repair_instruction": "Check PV string polarity."} for i in range(564, 580)},
+
+    # PV Abnormal Alarm (Dải 548-563 và 580-595)
+    **{i: {"id_sungrow": i, "id_unified": 1104, "name": "PV_INPUT_ABNORMAL", "severity": "WARNING", "repair_instruction": "Inspect PV string status."} for i in range(548, 564)},
+    **{i: {"id_sungrow": i, "id_unified": 1104, "name": "PV_INPUT_ABNORMAL", "severity": "WARNING", "repair_instruction": "Inspect PV string status."} for i in range(580, 596)},
+
+    # MPPT Reverse Connection (Dải 264-283)
+    **{i: {"id_sungrow": i, "id_unified": 1101, "name": "MPPT_REVERSE_CONNECTION", "severity": "ERROR", "repair_instruction": "Check MPPT input wiring."} for i in range(264, 284)},
+
+    # String Current Reflux (Dải 1548-1579)
+    **{i: {"id_sungrow": i, "id_unified": 1105, "name": "PV_STRING_FAULT", "severity": "WARNING", "repair_instruction": "Check for current reflux in PV strings."} for i in range(1548, 1580)},
+
+    # PV Grounding Fault (Dải 1600-1611)
+    **{i: {"id_sungrow": i, "id_unified": 1206, "name": "PV_GROUND_FAULT", "severity": "ERROR", "repair_instruction": "Inspect PV DC grounding system."} for i in range(1600, 1612)},
+
+    # --- ELECTRICAL & SAFETY ---
+    39: {"id_sungrow": 39, "id_unified": 1202, "name": "LOW_INSULATION_RESISTANCE", "severity": "ERROR", "repair_instruction": "Check insulation resistance of DC cables."},
+    106: {"id_sungrow": 106, "id_unified": 1206, "name": "GROUNDING_CABLE_FAULT", "severity": "ERROR", "repair_instruction": "Check grounding cable connection."},
+    88: {"id_sungrow": 88, "id_unified": 1601, "name": "ARC_FAULT", "severity": "ERROR", "repair_instruction": "Inspect DC cables for arc fault."},
+    84: {"id_sungrow": 84, "id_unified": 1507, "name": "METER_CT_REVERSE_CONNECTION", "severity": "WARNING", "repair_instruction": "Check Meter/CT wiring polarity."},
+    514: {"id_sungrow": 514, "id_unified": 1502, "name": "METER_COMM_FAULT", "severity": "DISCONNECT", "repair_instruction": "Check communication cable to Smart Meter."},
+    75: {"id_sungrow": 75, "id_unified": 1501, "name": "PARALLEL_COMM_ALARM", "severity": "WARNING", "repair_instruction": "Check parallel communication cables."},
+
+    # --- TEMPERATURE ---
+    37: {"id_sungrow": 37, "id_unified": 1302, "name": "HIGH_AMBIENT_TEMPERATURE", "severity": "ERROR", "repair_instruction": "Improve ventilation and cooling surroundings."},
+    43: {"id_sungrow": 43, "id_unified": 1303, "name": "LOW_AMBIENT_TEMPERATURE", "severity": "WARNING", "repair_instruction": "Ensure ambient temperature is within range."},
+
+    # --- HARDWARE & CAPACITORS ---
+    # Boost Capacitor Overvoltage Alarm (332-363)
+    **{i: {"id_sungrow": i, "id_unified": 1411, "name": "DC_BUS_CAPACITOR_FAULT", "severity": "WARNING", "repair_instruction": "Internal capacitor warning. Monitor device."} for i in range(332, 364)},
+    # Boost Capacitor Overvoltage Fault (364-395)
+    **{i: {"id_sungrow": i, "id_unified": 1411, "name": "DC_BUS_CAPACITOR_FAULT", "severity": "ERROR", "repair_instruction": "Internal hardware fault. Contact service."} for i in range(364, 396)},
+    
+    1616: {"id_sungrow": 1616, "id_unified": 1409, "name": "SYSTEM_HARDWARE_FAULT", "severity": "ERROR", "repair_instruction": "Contact technical support for board inspection."},
+
+    # --- SYSTEM FAULT (Dải mã lớn nhất 7 - 1122) ---
+    # Bao gồm các mã lẻ và dải mã trong tài liệu: 19-25, 30-34, 40-42, 44-50, 52-58, 60-68...
+    **{i: {"id_sungrow": i, "id_unified": 1701, "name": "SYSTEM_FAULT", "severity": "ERROR", "repair_instruction": "Internal system error. Restart inverter."} 
+       for i in (
+           [7, 11, 16, 36, 38, 85, 87, 92, 93, 605, 608, 612, 616, 620, 622, 623, 624, 800, 802, 804, 807] +
+           [x for r in [(19,25), (30,34), (40,42), (44,50), (52,58), (60,68), (100,105), (107,114), (116,124), (200,211), (248,255), (300,322), (324,326), (401,412), (600,603), (1096, 1122)] for x in range(r[0], r[1] + 1)]
+       )},
+
+    # --- SYSTEM ALARM (Các mã cảnh báo hệ thống) ---
+    **{i: {"id_sungrow": i, "id_unified": 1707, "name": "SYSTEM_ALARM", "severity": "WARNING", "repair_instruction": "Internal system warning. Monitor performance."}
+       for i in (
+           [59, 74, 76, 82, 83, 89, 900, 901, 910, 911, 635, 636, 637, 638] +
+           [x for r in [(70,72), (77,81), (216,218), (220,231), (432,434), (500,513), (515,518)] for x in range(r[0], r[1] + 1)]
+       )}
 }
 
 SUNGROW_STATE_MAP = {

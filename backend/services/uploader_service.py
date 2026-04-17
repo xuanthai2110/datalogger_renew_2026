@@ -47,6 +47,17 @@ class UploaderService:
                 url = f"{API_BASE_URL}/api/telemetry/project/{server_id}"
                 headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
                 response = requests.post(url, json=payload, headers=headers)
+                
+                # Handle 401 Unauthorized
+                if response.status_code == 401:
+                    logger.warning(f"Unauthorized (401) for project {server_id}. Attempting token renewal...")
+                    new_token = self.auth.handle_unauthorized()
+                    if new_token:
+                        token = new_token # Update token for current and future items in loop
+                        headers["Authorization"] = f"Bearer {token}"
+                        logger.info(f"Retrying upload for project {server_id} with new token...")
+                        response = requests.post(url, json=payload, headers=headers)
+
                 if response.status_code in (200, 201):
                     self.db.delete_from_outbox(data["id"])
                     logger.info(f"Uploaded project {server_id} (status={response.status_code})")
@@ -74,6 +85,14 @@ class UploaderService:
         url = f"{API_BASE_URL}/api/telemetry/project/{server_id}"
         try:
             logger.info(f"Sending immediate update for {server_id}...")
-            requests.post(url, json=payload, headers=headers, timeout=10)
+            response = requests.post(url, json=payload, headers=headers, timeout=10)
+            
+            if response.status_code == 401:
+                logger.warning(f"Unauthorized (401) on immediate send for {server_id}. Attempting token renewal...")
+                new_token = self.auth.handle_unauthorized()
+                if new_token:
+                    headers["Authorization"] = f"Bearer {new_token}"
+                    logger.info(f"Retrying immediate send for {server_id} with new token...")
+                    requests.post(url, json=payload, headers=headers, timeout=10)
         except Exception as e:
             logger.error(f"Immediate send error: {e}")
